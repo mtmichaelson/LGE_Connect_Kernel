@@ -121,6 +121,8 @@ struct pmic8058_kp {
 	u8			ctrl_reg;
 };
 
+//extern void MHL_On(bool on);
+
 static int pmic8058_kp_write_u8(struct pmic8058_kp *kp,
 				 u8 data, u16 reg)
 {
@@ -291,6 +293,8 @@ static int pmic8058_kp_read_matrix(struct pmic8058_kp *kp, u16 *new_state,
 	return rc;
 }
 
+extern int lgf_key_lock;
+
 static int __pmic8058_kp_scan_matrix(struct pmic8058_kp *kp, u16 *new_state,
 					 u16 *old_state)
 {
@@ -310,13 +314,28 @@ static int __pmic8058_kp_scan_matrix(struct pmic8058_kp *kp, u16 *new_state,
 					!(new_state[row] & (1 << col)) ?
 					"pressed" : "released");
 
+			if ( (!(new_state[row] & (1 << col))) && !row ) {
+				if (col == 0) {
+					printk("daniel.kang volume-up : MHL_ON\n");
+					//MHL_On(1);
+				}
+				else if (col == 1) {
+					printk("daniel.kang volume-dn : MHL_OFF\n");
+					//MHL_On(0);
+				}		
+			}
+
+
 			code = MATRIX_SCAN_CODE(row, col, PM8058_ROW_SHIFT);
 			input_event(kp->input, EV_MSC, MSC_SCAN, code);
-			input_report_key(kp->input,
-					kp->keycodes[code],
-					!(new_state[row] & (1 << col)));
 
-			input_sync(kp->input);
+			if(lgf_key_lock != 0x55){
+				input_report_key(kp->input,
+						kp->keycodes[code],
+						!(new_state[row] & (1 << col)));
+
+				input_sync(kp->input);
+			}
 		}
 	}
 

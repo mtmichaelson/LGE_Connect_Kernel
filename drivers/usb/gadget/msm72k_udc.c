@@ -66,15 +66,21 @@ static const char driver_name[] = "msm72k_udc";
 #define MSM_USB_BASE ((unsigned) ui->addr)
 
 #define	DRIVER_DESC		"MSM 72K USB Peripheral Controller"
-#define	DRIVER_NAME		"MSM72K_UDC"
+//#define	DRIVER_NAME		"MSM72K_UDC"
+#define	DRIVER_NAME		"MSM72K_UDC_AUTORUN"
 
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+
+#ifdef CONFIG_LGE_USB_AUTORUN
 #define	DRIVER_NAME_FOR_AUTORUN		"MSM72K_UDC_AUTORUN"
 #endif
 // [END] seunghun.kim : for LG_USB_DRIVER 2011.03.25
 #define EPT_FLAG_IN        0x0001
 
 #define SETUP_BUF_SIZE     8
+
+#ifdef CONFIG_LGE_USB_FACTORY
+extern int usb_cable_info;	// daniel.kang
+#endif
 
 static const char *const ep_name[] = {
 	"ep0out", "ep1out", "ep2out", "ep3out",
@@ -89,9 +95,6 @@ static const char *const ep_name[] = {
 
 /*To release the wakelock from debugfs*/
 static int release_wlocks;
-// START sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP : USB_DISCONNECT_DEALYED_WAKE_UNLOCK {
-static struct delayed_work usb_wake_unlock_wq;
-// END sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP }
 
 struct msm_request {
 	struct usb_request req;
@@ -146,21 +149,17 @@ static struct timer_list phy_status_timer;
 
 static void usb_do_work(struct work_struct *w);
 static void usb_do_remote_wakeup(struct work_struct *w);
-
-#if 0//defined (CONFIG_LGE_USB_GADGET_SUPPORT_FACTORY_USB)
-extern int android_switch_composition(u16 pid);
-extern const u16 lg_factory_pid;
-#endif /*CONFIG_LGE_USB_GADGET_SUPPORT_FACTORY_USB*/
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
+#if 1//def CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
 extern const u16 lg_charge_only_pid;
 #endif
-#if defined (CONFIG_LGE_USB_GADGET_SUPPORT_FACTORY_USB) || defined(CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO)
+#if 1//defined (CONFIG_LGE_USB_GADGET_SUPPORT_FACTORY_USB) || defined(CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO)
 extern u16 product_id;
 #endif
-/* 2011.06.28 jaeho.cho@lge.com temporary for autorun application issue*/
-#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN)
-u8 autorun_onlone = 0;
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+extern u16 android_get_product_id(void);
 #endif
+
+
 #define USB_STATE_IDLE    0
 #define USB_STATE_ONLINE  1
 #define USB_STATE_OFFLINE 2
@@ -175,9 +174,6 @@ u8 autorun_onlone = 0;
 #define USB_CHG_DET_DELAY	msecs_to_jiffies(1000)
 #define REMOTE_WAKEUP_DELAY	msecs_to_jiffies(1000)
 #define PHY_STATUS_CHECK_DELAY	(jiffies + msecs_to_jiffies(1000))
-// START sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP : USB_DISCONNECT_DEALYED_WAKE_UNLOCK {
-#define USB_WAKE_UNLOCK_DELAY	msecs_to_jiffies(3000)
-// END sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP }
 
 struct usb_info {
 	/* lock for register/queue/device state changes */
@@ -230,7 +226,7 @@ struct usb_info {
 	struct usb_gadget_driver	*driver;
 	struct switch_dev sdev;
 
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#ifdef CONFIG_LGE_USB_AUTORUN
 	struct switch_dev sdev_autorun;
 #endif
 
@@ -270,18 +266,9 @@ static acc_cable_type ta_cable_type=NO_INIT_CABLE;
 #endif
 #ifdef CONFIG_LGE_USB_FACTORY
 extern int android_set_pid_without_reset(const char *val, acc_cable_type usb_cable_type);
-extern u16 android_get_product_id(void);
 
-extern int usb_cable_info;	// daniel.kang
 extern const u16 lg_default_pid;
 extern const u16 lg_factory_pid;
-#endif
-
-#ifdef  CONFIG_LGE_MHL_SII9244
-#define MHL_PWRON_DELAY	100
-extern void mhl_delayed_pwron_request(unsigned int delay_ms);
-extern void mhl_pwron_request(void);  
-extern void mhl_pwroff_request_vbus_removed(void);
 #endif
 
 static void msm_hsusb_set_speed(struct usb_info *ui)
@@ -336,8 +323,7 @@ static ssize_t print_switch_state(struct switch_dev *sdev, char *buf)
 {
 	return sprintf(buf, "%s\n", sdev->state ? "online" : "offline");
 }
-
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#ifdef CONFIG_LGE_USB_AUTORUN
 static ssize_t print_switch_name_for_autorun(struct switch_dev *sdev, char *buf)
 {
 	return sprintf(buf, "%s\n", DRIVER_NAME_FOR_AUTORUN);
@@ -471,7 +457,7 @@ sanity_out:
 #endif
 }
 
-static acc_cable_type get_ta_cable_type(void)
+static acc_cable_type ta_cable_adc_read(void)
 {
 	int acc_read_value = 0;
 	acc_cable_type cable_type = 0;
@@ -479,29 +465,15 @@ static acc_cable_type get_ta_cable_type(void)
 	acc_read_value = acc_read_adc(CHANNEL_ADC_ACC, NULL);
 	pr_err("%s: TA_acc_read_value final is %d\n", __func__, acc_read_value);
 
-#ifdef CONFIG_MACH_LGE_I_BOARD_LGU
 	if((0<=acc_read_value)&&(acc_read_value<=70))
 	{
 		cable_type = MHL_CABLE_500MA;
 	}
-	else if((2150<=acc_read_value)&&(acc_read_value<=2250)) // 0K
-	{
-		cable_type = TA_CABLE_800MA;
-	}
-	else // others, 500mA forged TA cable
-	{
-		cable_type = TA_CABLE_FORGED_500MA;
-	}
-#else
-	if((0<=acc_read_value)&&(acc_read_value<=70))
-	{
-		cable_type = MHL_CABLE_500MA;
-	}
-	else if((960<=acc_read_value)&&(acc_read_value<=1089)) // 180K, 200K ==> 600mA TA cable
+	else if((960<=acc_read_value)&&(acc_read_value<=1120)) // 180K, 200K ==> 600mA TA cable
 	{
 		cable_type = TA_CABLE_600MA;
 	}
-	else if((1090<=acc_read_value)&&(acc_read_value<=1208)) // 220K, 800mA TA cable
+	else if((1121<=acc_read_value)&&(acc_read_value<=1208)) // 220K, 800mA TA cable
 	{
 		cable_type = TA_CABLE_800MA;
 	}
@@ -513,49 +485,70 @@ static acc_cable_type get_ta_cable_type(void)
 	{
 		cable_type = TA_CABLE_FORGED_500MA;
 	}
-#endif
+
+	return cable_type;
+
+}
+
+static acc_cable_type get_ta_cable_type(void)
+{
+	acc_cable_type cable_type = 0;
+	acc_cable_type temp_cable_tpe = 0;
+	int cable_stability = 0;
+	int retry_cnt = 10;
+	
+	cable_type = ta_cable_adc_read();
+	temp_cable_tpe = cable_type;
+
+	while(1)
+	{
+		msleep(10);
+		cable_type = ta_cable_adc_read();
+		
+		if(temp_cable_tpe == cable_type)
+		{
+			cable_stability = cable_stability + 1;
+			retry_cnt = retry_cnt - 1;
+			
+			if (cable_stability >= 5 && retry_cnt >= 0)
+			{
+				break;
+			}
+			else if(cable_stability < 5 && retry_cnt < 0)
+			{
+				cable_type = TA_CABLE_FORGED_500MA;
+				break;
+			}
+			
+		}
+		else
+		{
+			temp_cable_tpe = cable_type;
+			cable_stability = 0;
+		}
+	}
+	
 	return cable_type;
 }
 
-static acc_cable_type get_usb_cable_type(void)
+static acc_cable_type usb_cable_adc_read(void)
 {
 	int acc_read_value = 0;
 	acc_cable_type cable_type = 0;
 
 	acc_read_value = acc_read_adc(CHANNEL_ADC_ACC, NULL);
 	pr_err("%s: usb_acc_valid_read_value is %d\n", __func__, acc_read_value);
-
-#ifdef CONFIG_MACH_LGE_I_BOARD_LGU
-	if((370<=acc_read_value)&&(acc_read_value<=600)) // 56k ==>LT cable, maximum current
+	
+	
+	if((350<=acc_read_value)&&(acc_read_value<=550)) // 56k ==>LT cable, maximum current
     {
 		cable_type = LT_CABLE_56K;
     }
-    else if((750<=acc_read_value)&&(acc_read_value<=959)) // 130k ==>LT cable, maximum current
+    else if((800<=acc_read_value)&&(acc_read_value<=927)) // 130k ==>LT cable, maximum current
 	{
 		cable_type = LT_CABLE_130K;
 	}
-    else if((1690<=acc_read_value)&&(acc_read_value<=1920)) // 910k ==>LT cable, maximum current
-	{
-		cable_type = LT_CABLE_56K; // Actually 910k, but run like 56k
-	}
-	else if((2150<=acc_read_value)&&(acc_read_value<=2250)) // 0K
-	{
-		cable_type = USB_CABLE_400MA;
-	}
-	else //others ==> abnormal USB cable, 400mA
-	{
-		cable_type = ABNORMAL_USB_CABLE_400MA;
-	}
-#else	
-	if((370<=acc_read_value)&&(acc_read_value<=600)) // 56k ==>LT cable, maximum current
-    {
-		cable_type = LT_CABLE_56K;
-    }
-    else if((750<=acc_read_value)&&(acc_read_value<=959)) // 130k ==>LT cable, maximum current
-	{
-		cable_type = LT_CABLE_130K;
-	}
-	else if((1090<=acc_read_value)&&(acc_read_value<=1208)) // 180K,200K,220k ==> USB cable, 400mA
+	else if((960<=acc_read_value)&&(acc_read_value<=1208)) // 180K,200K,220k ==> USB cable, 400mA
 	{
 		cable_type = USB_CABLE_400MA;
 	}
@@ -563,7 +556,7 @@ static acc_cable_type get_usb_cable_type(void)
 	{
 		cable_type = USB_CABLE_DTC_500MA;
 	}
-    else if((1690<=acc_read_value)&&(acc_read_value<=1920)) // 910k ==>LT cable, maximum current
+    else if((1738<=acc_read_value)&&(acc_read_value<=1868)) // 910k ==>LT cable, maximum current
 	{
 		cable_type = LT_CABLE_56K; // Actually 910k, but run like 56k
     }
@@ -571,7 +564,47 @@ static acc_cable_type get_usb_cable_type(void)
 	{
 		cable_type = ABNORMAL_USB_CABLE_400MA;
 	}
-#endif
+	return cable_type;
+}
+
+static acc_cable_type get_usb_cable_type(void)
+{
+	acc_cable_type cable_type = 0;
+	acc_cable_type temp_cable_tpe = 0;
+	int cable_stability = 0;
+	int retry_cnt = 10;
+	
+	cable_type = usb_cable_adc_read();
+	temp_cable_tpe = cable_type;
+	
+	while(1)
+	{
+		msleep(10);
+		cable_type = usb_cable_adc_read();
+		
+		if(temp_cable_tpe == cable_type)
+		{
+			cable_stability = cable_stability + 1;
+			retry_cnt = retry_cnt - 1;
+			
+			if (cable_stability >= 3 && retry_cnt >= 0)
+			{
+				break;
+			}
+			else if(cable_stability < 3 && retry_cnt < 0)
+			{
+				cable_type = ABNORMAL_USB_CABLE_400MA;
+				break;
+			}
+			
+		}
+		else
+		{
+			temp_cable_tpe = cable_type;
+			cable_stability = 0;
+		}
+	}
+	
 	return cable_type;
 }
 
@@ -616,17 +649,6 @@ static inline enum chg_type usb_get_chg_type(struct usb_info *ui)
 #endif
 }
 
-#ifdef CONFIG_LGE_HALLIC_CARKIT
-extern void hall_ic_dock_report_event(int state);
-extern int hall_ic_get_dock_state(void);
-#endif
-
-#ifdef CONFIG_LGE_PM_CURRENT_CABLE_TYPE
-/* START. kiwone.seo@lge.com, 2011-08-11, to meet VZW spec , in case of booting up with TA+no battery */
-extern int get_is_battery_present(void);
-int first_check = 0;
-/* END */
-#endif
 
 #define USB_WALLCHARGER_CHG_CURRENT 1800
 static int usb_get_max_power(struct usb_info *ui)
@@ -665,21 +687,10 @@ static int usb_get_max_power(struct usb_info *ui)
 			bmaxpow = 800;
 		else if(ta_cable_type == TA_CABLE_FORGED_500MA)
 			bmaxpow = 500; 	
-/* START. kiwone.seo@lge.com, 2011-08-11, to meet VZW spec , in case of booting up with TA+no battery */
-		if(0 == get_is_battery_present() && (first_check == 0))
-		{	
-			pr_err("====%s: TA without battery\n", __func__);
-			bmaxpow = 1200;
-			first_check = 1;
-		}
-/* END */
+
 		pr_err("====%s: ta_cable_type=%d,maxpower=%d\n", __func__,ta_cable_type,bmaxpow);
 #ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
 		set_ext_cable_type_value(ta_cable_type,NO_INIT_CABLE);
-#endif
-#ifdef CONFIG_LGE_HALLIC_CARKIT
-		if( (ta_cable_type == TA_CABLE_DTC_800MA) )
-			hall_ic_dock_report_event(1);
 #endif
 		return bmaxpow;
 	}
@@ -710,21 +721,12 @@ static int usb_get_max_power(struct usb_info *ui)
 #ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
 		set_ext_cable_type_value(NO_INIT_CABLE,usb_cable_type);
 #endif
-#ifdef CONFIG_LGE_HALLIC_CARKIT
-		if( (usb_cable_type == USB_CABLE_DTC_500MA) )
-			hall_ic_dock_report_event(1);
-#endif
 	}
 
 
 #else
 	if (temp == USB_CHG_TYPE__WALLCHARGER)
 		return USB_WALLCHARGER_CHG_CURRENT;
-#endif
-
-    /* 20110630 hoyeon.jang@lge.com */
-#ifdef CONFIG_LGE_MHL_SII9244
-    mhl_pwron_request();
 #endif
 
 #ifdef CONFIG_LGE_PM_CURRENT_CABLE_TYPE
@@ -739,15 +741,6 @@ static int usb_get_max_power(struct usb_info *ui)
 
 	return bmaxpow;
 }
-// START sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP : USB_DISCONNECT_DEALYED_WAKE_UNLOCK {
-static void usb_wake_unlock(struct work_struct *w)
-{
-	struct usb_info *ui = the_usb_info;
-
-    wake_unlock(&ui->wlock);
-    printk(KERN_DEBUG "%s: wake unlocked!\n",__func__);
-}
-// END sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP }
 
 static int usb_phy_stuck_check(struct usb_info *ui)
 {
@@ -853,7 +846,6 @@ static void usb_chg_detect(struct work_struct *w)
 	maxpower = usb_get_max_power(ui);
 	if (maxpower > 0)
 		otg_set_power(ui->xceiv, maxpower);
-
 
 	/* USB driver prevents idle and suspend power collapse(pc)
 	 * while USB cable is connected. But when dedicated charger is
@@ -1783,9 +1775,6 @@ static void usb_prepare(struct usb_info *ui)
 	INIT_DELAYED_WORK(&ui->rw_work, usb_do_remote_wakeup);
 	if (ui->pdata && ui->pdata->is_phy_status_timer_on)
 		INIT_WORK(&ui->phy_status_check, usb_phy_stuck_recover);
-// START sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP : USB_DISCONNECT_DEALYED_WAKE_UNLOCK {
-	INIT_DELAYED_WORK(&usb_wake_unlock_wq, usb_wake_unlock);
-// END sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP }
 }
 
 #ifdef CONFIG_LGE_USB_FACTORY
@@ -1844,6 +1833,15 @@ static int ulpi_write(struct usb_info *ui, unsigned val, unsigned reg)
 }
 #endif
 
+// START sungchae.koo@lge.com 2011/07/28 P1_LAB_BSP : FIX_USB_CONNECTION_MODE_WHILE_FACTORY_CABLE {
+#ifdef CONFIG_LGE_USB_FACTORY
+acc_cable_type get_usb_cable_type_value(void)
+{
+    return usb_cable_type;
+}
+#endif
+// END sungchae.koo@lge.com 2011/07/28 P1_LAB_BSP }
+
 // START sungchae.koo@lge.com 2011/07/25 P1_LAB_BSP {
 #ifdef CONFIG_LGE_USB_FACTORY
 extern int msm_hsusb_ldo_set_3p5( void );
@@ -1854,9 +1852,8 @@ static void usb_reset(struct usb_info *ui)
 {
 	struct msm_otg *otg = to_msm_otg(ui->xceiv);
 #ifdef CONFIG_LGE_USB_FACTORY
-    char usb_pid[5];
-    int retry_cnt = 5;
-    unsigned tmp; 
+		char usb_pid[5];
+		unsigned tmp; 
 #endif
 
 	dev_dbg(&ui->pdev->dev, "reset controller\n");
@@ -1880,20 +1877,10 @@ static void usb_reset(struct usb_info *ui)
 
 #ifdef CONFIG_LGE_USB_FACTORY
     usb_cable_type = get_usb_cable_type();
-    while (usb_cable_type == ABNORMAL_USB_CABLE_400MA)
-    {
-        if (--retry_cnt < 0)
-            break;
-
-        msleep(200);
-        usb_cable_type = get_usb_cable_type();
-    }
-
-    pr_info("%s: usb_cable_type = %d\n", __func__, usb_cable_type);
 
 // START sungchae.koo@lge.com 2011/07/25 P1_LAB_BSP {
 #ifdef CONFIG_LGE_USB_FACTORY
-    if( LT_CABLE_56K == usb_cable_type )
+	if(usb_cable_type==LT_CABLE_56K)
     {
         int rc = 0;
         rc = msm_hsusb_ldo_set_3p5();
@@ -1902,6 +1889,7 @@ static void usb_reset(struct usb_info *ui)
 #endif
 // END sungchae.koo@lge.com 2011/07/25 P1_LAB_BSP }
 
+    pr_info("%s: usb_cable_type = %d\n", __func__, usb_cable_type);
     switch (usb_cable_type)
     {
         case LT_CABLE_56K:
@@ -2020,7 +2008,7 @@ int usb_online_flag_check(void)
 }
 #endif
 
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
+#if 1//def CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
 void usb_charge_only_softconnect(void)
 {
 	struct usb_info *ui = the_usb_info;
@@ -2031,13 +2019,6 @@ void usb_charge_only_softconnect(void)
 	}
 
 }
-#endif
-#ifdef CONFIG_LGE_MHL_SII9244
-int check_usb_online(void)
-{
-  return is_usb_online(the_usb_info);
-}
-EXPORT_SYMBOL(check_usb_online);
 #endif
 
 static void usb_do_work(struct work_struct *w)
@@ -2095,19 +2076,17 @@ static void usb_do_work(struct work_struct *w)
 				msm72k_pullup_internal(&ui->gadget, 1);
 
 				if (!ui->gadget.is_a_peripheral)
-				{
 					schedule_delayed_work(
 							&ui->chg_det,
 							USB_CHG_DET_DELAY);
-#ifdef  CONFIG_LGE_MHL_SII9244
-					mhl_delayed_pwron_request(MHL_PWRON_DELAY);
-#endif
-				}
+
 			}
 			break;
 		case USB_STATE_ONLINE:
 			if (atomic_read(&ui->offline_pending)) {
+#if 0 //ys.seong adb on/off ½Ã usb connect/disconnect ¹ß»ý 
 				switch_set_state(&ui->sdev, 0);
+#endif
 				atomic_set(&ui->offline_pending, 0);
 			}
 
@@ -2159,50 +2138,27 @@ static void usb_do_work(struct work_struct *w)
 					ui->irq = 0;
 				}
 
-#ifdef CONFIG_LGE_HALLIC_CARKIT
-				printk(KERN_INFO"%s: usb_cable_type :%d\n",__func__,usb_cable_type);
-//				if( (get_ext_cable_type_value() == TA_CABLE_DTC_800MA) || (get_ext_cable_type_value() == USB_CABLE_DTC_500MA) )
-				if( hall_ic_get_dock_state() == 1)
-					hall_ic_dock_report_event(0);
-#endif
-
 				switch_set_state(&ui->sdev, 0);
 
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#ifdef CONFIG_LGE_USB_AUTORUN
 				pr_info("%s: switch_set_state() FLAG_VBUS_OFFLINE\n", __func__);
-/* 2011.06.28 jaeho.cho@lge.com temporary for autorun application issue*/
-                autorun_onlone = 0;
 				switch_set_state(&ui->sdev_autorun, 0);
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
-                if(product_id == lg_charge_only_pid)
-                {
-                  atomic_set(&ui->softconnect, 1);
-                }
 #endif
+#if 1//def CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
+                if(product_id == lg_charge_only_pid)
+        		{
+                  atomic_set(&ui->softconnect, 1);
+        		}
 #endif
 #ifdef CONFIG_LGE_PM_CURRENT_CABLE_TYPE 
 				set_ext_cable_type_value(NO_INIT_CABLE,NO_INIT_CABLE);
 				pr_info("%s: external_cable_type_set_to_default\n", __func__);
 #endif
-#ifdef CONFIG_LGE_MHL_SII9244
-                if(!_vbus)
-                {
-				  mhl_pwroff_request_vbus_removed();
-				}
-#endif
 				ui->state = USB_STATE_OFFLINE;
 				usb_do_work_check_vbus(ui);
 				pm_runtime_put_noidle(&ui->pdev->dev);
 				pm_runtime_suspend(&ui->pdev->dev);
-// START sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP : USB_DISCONNECT_DEALYED_WAKE_UNLOCK {
-#if 1
-                cancel_delayed_work(&usb_wake_unlock_wq);    
-                schedule_delayed_work(&usb_wake_unlock_wq, USB_WAKE_UNLOCK_DELAY);
-                printk(KERN_DEBUG "%s: schedule_delayed_work(), 3sec\n",__func__);
-#else
 				wake_unlock(&ui->wlock);
-#endif
-// END sungchae.koo@lge.com 2011/09/16 P1_LAB_BSP }
 				break;
 			}
 			if (flags & USB_FLAG_SUSPEND) {
@@ -2211,20 +2167,7 @@ static void usb_do_work(struct work_struct *w)
 				if (maxpower < 0)
 					break;
 
-// START sungchae.koo@lge.com 2011/09/05 P1_LAB_BSP : DEBUG_STOP_CHARGING_BY_SAFTY_USB_DEVICE_REMOVAL {
-#if 1
-		printk(KERN_DEBUG "[tb] %s: enter USB_FLAG_SUSPEND\n",__func__);
-			
-		 if( _vbus ) {
-			printk(KERN_DEBUG "[tb] %s: _vbus is valid, keep charging\n",__func__);
-		 } else {
-			printk(KERN_DEBUG "[tb] %s: _vbus is invalid, stop charging\n",__func__);
-			otg_set_power(ui->xceiv, 0);
-		 }
-#else
 				otg_set_power(ui->xceiv, 0);
-#endif
-// END sungchae.koo@lge.com 2011/09/05 P1_LAB_BSP }
 				/* To support TCXO during bus suspend
 				 * This might be dummy check since bus suspend
 				 * is not implemented as of now
@@ -2245,10 +2188,8 @@ static void usb_do_work(struct work_struct *w)
 				switch_set_state(&ui->sdev,
 						atomic_read(&ui->configured));
 
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#ifdef CONFIG_LGE_USB_AUTORUN
 				pr_info("%s: switch_set_state() USB_FLAG_CONFIGURED\n", __func__);
-/* 2011.06.28 jaeho.cho@lge.com temporary for autorun application issue*/
-				autorun_onlone = 1;
 				switch_set_state(&ui->sdev_autorun,
 				atomic_read(&ui->configured));
 #endif
@@ -2302,7 +2243,7 @@ static void usb_do_work(struct work_struct *w)
 				ui->irq = otg->irq;
 				enable_irq_wake(otg->irq);
 
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
+#if 1//def CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
 				if (!atomic_read(&ui->softconnect)) {
 					if (product_id != lg_charge_only_pid)
 						break;
@@ -2311,17 +2252,13 @@ static void usb_do_work(struct work_struct *w)
 				if (!atomic_read(&ui->softconnect))
 					break;
 #endif
+
 				msm72k_pullup_internal(&ui->gadget, 1);
 
 				if (!ui->gadget.is_a_peripheral)
-				{
 					schedule_delayed_work(
 							&ui->chg_det,
 							USB_CHG_DET_DELAY);
-#ifdef  CONFIG_LGE_MHL_SII9244
-					mhl_delayed_pwron_request(MHL_PWRON_DELAY);
-#endif
-				}
 			}
 			break;
 		}
@@ -2839,12 +2776,7 @@ static int msm72k_pullup(struct usb_gadget *_gadget, int is_active)
 	msm72k_pullup_internal(_gadget, is_active);
 
 	if (is_active && !ui->gadget.is_a_peripheral)
-	{
 		schedule_delayed_work(&ui->chg_det, USB_CHG_DET_DELAY);
-#ifdef  CONFIG_LGE_MHL_SII9244
-		mhl_delayed_pwron_request(MHL_PWRON_DELAY);
-#endif
-	}
 
 	return 0;
 }
@@ -3023,7 +2955,7 @@ static ssize_t show_usb_chg_type(struct device *dev,
 // [END] seunghun.kim : for LG_USB_DRIVER 2011.03.25
 static DEVICE_ATTR(wakeup, S_IWUSR, 0, usb_remote_wakeup);
 // [START] seunghun.kim : for LG_USB_DRIVER 2011.03.25
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#ifdef CONFIG_LGE_USB_AUTORUN
 static DEVICE_ATTR(usb_state, S_IRUGO, show_usb_state, 0);
 #else
 // [END] seunghun.kim : for LG_USB_DRIVER 2011.03.25
@@ -3139,7 +3071,7 @@ static int msm72k_probe(struct platform_device *pdev)
 	if (retval)
 		return usb_free(ui, retval);
 
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#ifdef CONFIG_LGE_USB_AUTORUN
 	ui->sdev_autorun.name = DRIVER_NAME_FOR_AUTORUN;
 	ui->sdev_autorun.print_name = print_switch_name_for_autorun;
 	ui->sdev_autorun.print_state = print_switch_state_for_autorun;
@@ -3180,7 +3112,7 @@ static int msm72k_probe(struct platform_device *pdev)
 			__func__, retval);
 		switch_dev_unregister(&ui->sdev);
 // [START] seunghun.kim : for LG_USB_DRIVER 2011.03.25
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#ifdef CONFIG_LGE_USB_AUTORUN
 		switch_dev_unregister(&ui->sdev_autorun);
 #endif 
 // [END] seunghun.kim : for LG_USB_DRIVER 2011.03.25
@@ -3245,6 +3177,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 		goto fail;
 	}
 
+	retval = device_create_file(&ui->gadget.dev, &dev_attr_wakeup);
 	if (retval != 0)
 		dev_err(&ui->pdev->dev, "failed to create sysfs entry:"
 			"(wakeup) error: (%d)\n", retval);

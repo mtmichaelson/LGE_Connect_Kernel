@@ -165,33 +165,15 @@ int fc8050_ppi_bulkwrite(HANDLE hDevice, fci_u16 addr, fci_u8* data, fci_u16 len
 
 int fc8050_ppi_dataread(HANDLE hDevice, fci_u16 addr, fci_u8* data, fci_u16 length)
 {
-	int i, j;
-	fci_u16 x, y;
+	int i;
 
-	x = length / 4095;
-	y = length % 4095;
-
-	
-	for(i=0; i<x; i++) {
-		FC8050_PPI_REG = addr & 0xff;
-		FC8050_PPI_REG = (addr & 0xff00) >> 8;
-		FC8050_PPI_REG = PPI_READ | ((4095 & 0x0f00) >> 8);
-		FC8050_PPI_REG = 4095 & 0xff;
-
-		for(j=0; j<4095; j++) {
-			data[4095*i+j] = FC8050_PPI_REG;
-		}
-	}
-
-	if(y) {
 	FC8050_PPI_REG = addr & 0xff;
 	FC8050_PPI_REG = (addr & 0xff00) >> 8;
-		FC8050_PPI_REG = PPI_READ | ((y & 0x0f00) >> 8);
-		FC8050_PPI_REG = y & 0xff;
+	FC8050_PPI_REG = PPI_READ | ((length & 0x0f00) >> 8);
+	FC8050_PPI_REG = length & 0xff;
 
-		for(j=0; j<y; j++) {
-			data[4095*x+j] = FC8050_PPI_REG;
-		}
+	for(i=0; i<length; i++) {
+		data[i] = FC8050_PPI_REG;
 	}
 	
 	return BBM_OK;

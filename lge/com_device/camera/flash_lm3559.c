@@ -66,6 +66,9 @@ enum{
    LM3559_STATE_ON_STROBE,
 };
 
+#ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
+extern int is_temp_too_cold(void);
+#endif
 
 static struct lm3559_flash_platform_data *lm3559_pdata = NULL;
 static struct i2c_client *lm3559_client = NULL;
@@ -210,14 +213,25 @@ void lm3559_enable_flash_mode(int state)
 		lm3559_i2c_write(lm3559_client,LM3559_REG_FLASH_BRIGHTNESS,0x11);
 	}
 	else{
-		/* 0111 : 393.75 mA*/
-        lm3559_i2c_write(lm3559_client,LM3559_REG_FLASH_BRIGHTNESS,0x66);
-		//lm3559_i2c_write(lm3559_client,LM3559_REG_FLASH_BRIGHTNESS,0x88);
+/* elin.lee@lge.com 2011-12-01 for camera flash current under 5 below zero, PV issue*/		
+#ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
+		if(is_temp_too_cold() == 1){
+			printk("%s: LM3559_REG_FLASH_CURRENT[0x11]\n",__func__);
+			/* 0001 : 112.5 mA */
+			lm3559_i2c_write(lm3559_client,LM3559_REG_FLASH_BRIGHTNESS,0x11);
+		}
+		else
+#endif
+		{
+			printk("%s: LM3559_REG_FLASH_CURRENT[0X55]\n",__func__);
+			/* 0101 : 337.5 mA */
+			lm3559_i2c_write(lm3559_client,LM3559_REG_FLASH_BRIGHTNESS,0x55);
+			//lm3559_i2c_write(lm3559_client,LM3559_REG_FLASH_BRIGHTNESS,0x88);
+		}
 	}
 
 	lm3559_i2c_write(lm3559_client,LM3559_REG_ENABLE,0x1B);
 	
-
 }
 
 void lm3559_power_onoff(int onoff){

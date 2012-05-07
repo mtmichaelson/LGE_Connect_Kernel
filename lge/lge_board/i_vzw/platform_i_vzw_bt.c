@@ -71,9 +71,9 @@ static unsigned bt_config_power_on[] = {
 	GPIO_CFG(BT_RESET_N, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), /* BT_RESET */
 };
 static unsigned bt_config_power_off[] = {
-	GPIO_CFG(BT_WAKE, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* WAKE */
-	GPIO_CFG(BT_HOST_WAKE, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),	/* HOST_WAKE */
-	GPIO_CFG(BT_RESET_N, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), /* BT_RESET */
+	GPIO_CFG(BT_WAKE, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* WAKE */
+	GPIO_CFG(BT_HOST_WAKE, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* HOST_WAKE */
+	GPIO_CFG(BT_RESET_N, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* BT_RESET */
 };
 
 static int configure_uart_gpios(int on)
@@ -313,6 +313,8 @@ static struct platform_device *bt_devices[] __initdata = {
 void __init lge_add_btpower_devices(void)
 {	
 	bt_power_init();
+	printk(KERN_ERR "[LG_BTUI] %s : Called BT Poweer Init",__func__); 
+	
 	platform_add_devices(bt_devices, ARRAY_SIZE(bt_devices));
 //	platform_device_register(&msm_bt_power_device);
 //	platform_device_register(&msm_bluesleep_device);

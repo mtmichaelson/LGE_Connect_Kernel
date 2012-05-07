@@ -47,7 +47,7 @@
 #if defined (CONFIG_LGE_SENSOR_ACCELEROMETER)|| defined (CONFIG_LGE_SENSOR_GYROSCOPER)
 #define MSM_GSBI10_QUP_I2C_BUS_ID 11
 #endif
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 #define MSM_GSBI11_QUP_I2C_BUS_ID 12
 #endif
 #define LGE_GSBI_BUS_ID_AUDIO_AMP_WM9093    MSM_GSBI3_QUP_I2C_BUS_ID
@@ -100,7 +100,11 @@ extern struct platform_device msm_bus_cpss_fpb;
 #endif
 
 extern struct platform_device msm_device_smd;
-extern struct platform_device msm_device_kgsl;
+extern struct platform_device msm_kgsl_3d0;
+#ifdef CONFIG_MSM_KGSL_2D
+extern struct platform_device msm_kgsl_2d0;
+extern struct platform_device msm_kgsl_2d1;
+#endif
 extern struct platform_device msm_device_gpio;
 extern struct platform_device msm_device_vidc;
 
@@ -111,7 +115,13 @@ extern struct platform_device msm_device_rng;
 #endif
 
 void __init msm8x60_init_irq(void);
+#ifdef CONFIG_MSM_KGSL_2D
 void __init msm8x60_check_2d_hardware(void);
+#endif
+
+/* platform@lge.com */
+void __init msm_fb_register_device(char *name, void *data);
+/* end platform@lge.com */
 
 #ifdef CONFIG_MSM_DSPS
 extern struct platform_device msm_dsps_device;

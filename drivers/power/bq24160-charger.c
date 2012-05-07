@@ -7,7 +7,7 @@
  *  option) any later version.
  *
  */
-#undef DEBUG
+#define DEBUG
 #include <linux/i2c.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
@@ -27,6 +27,7 @@
 #endif
 
 #define BQ24160_CABLE_PWRON_INT
+#undef BQ24160_HZMODE_CTRL
 #define BQ24160_WORKAROUND_CHG_DONE
 
 // define register map
@@ -123,8 +124,8 @@
 #define BQ24160_STAT_NA 						6
 #define BQ24160_STAT_FAULT						7
 
-#define BQ24160_CHG_WORK_PERIOD	((HZ) * 3)
-#define BQ24160_CHG_DONE_WORK_PERIOD	((HZ) * 20)
+#define BQ24160_CHG_WORK_PERIOD	((HZ) * 10)
+#define BQ24160_CHG_DONE_WORK_PERIOD	((HZ) * 3)
 
 #define WIRELESS_CHARGE_STATUS	71
 #define WIRELESS_CHARGE_COMPLETE	141
@@ -134,6 +135,9 @@ struct bq24160_chip {
 	struct i2c_client *client;
 	struct delayed_work charge_work;
 	struct delayed_work charge_done_work;
+#ifdef BQ24160_HZMODE_CTRL
+	struct delayed_work hzmode_ctrl_work;
+#endif	
 	struct power_supply charger;
 	struct bq24160_platform_data *pdata;
 	int irq;
@@ -147,13 +151,9 @@ struct bq24160_chip {
 #endif
 };
 
-static struct workqueue_struct *local_charge_wq;
-static struct workqueue_struct *local_charge_done_wq;
-
 #ifdef BQ24160_WORKAROUND_CHG_DONE /* work around for charge done*/
 static int chg_done_cnt = 0;
 #endif
-static int wireless_chg_online = 0;
 
 static int bq24160_write_reg(struct i2c_client *client, u8 reg, u8 value)
 {
@@ -244,8 +244,7 @@ static void bq24160_charge(struct work_struct *bq24160_work)
 				msm_charger_notify_event(&bq24160_chg->adapter_hw_chg, CHG_DONE_EVENT);
 
 				wake_lock(&bq24160_chg->wl);
-				//schedule_delayed_work(&bq24160_chg->charge_done_work, BQ24160_CHG_DONE_WORK_PERIOD);
-				queue_delayed_work(local_charge_done_wq, &bq24160_chg->charge_done_work, BQ24160_CHG_DONE_WORK_PERIOD);
+				schedule_delayed_work(&bq24160_chg->charge_done_work, BQ24160_CHG_DONE_WORK_PERIOD);
 				break;
 			case BQ24160_STAT_NA:
 				break;
@@ -264,7 +263,7 @@ static void bq24160_charge(struct work_struct *bq24160_work)
 		if(val)
 		{
 			chg_done_cnt++;
-			if(chg_done_cnt >= 2)
+			if(chg_done_cnt >= 5)
 			{
 				dev_dbg(&bq24160_chg->client->dev, "%s Charge done by Interrupt High!!!\n", __func__);
 				rc = gpio_direction_output(WIRELESS_CHARGE_COMPLETE, 1);
@@ -275,8 +274,7 @@ static void bq24160_charge(struct work_struct *bq24160_work)
 				msm_charger_notify_event(&bq24160_chg->adapter_hw_chg, CHG_DONE_EVENT);
 				
 				wake_lock(&bq24160_chg->wl);
-				//schedule_delayed_work(&bq24160_chg->charge_done_work, BQ24160_CHG_DONE_WORK_PERIOD);
-				queue_delayed_work(local_charge_done_wq, &bq24160_chg->charge_done_work, BQ24160_CHG_DONE_WORK_PERIOD);
+				schedule_delayed_work(&bq24160_chg->charge_done_work, BQ24160_CHG_DONE_WORK_PERIOD);
 			}	
 		}
 		else
@@ -284,8 +282,8 @@ static void bq24160_charge(struct work_struct *bq24160_work)
 			chg_done_cnt = 0;
 		}
 #endif
-		//schedule_delayed_work(&bq24160_chg->charge_work, BQ24160_CHG_WORK_PERIOD);
-		queue_delayed_work(local_charge_wq, &bq24160_chg->charge_work, BQ24160_CHG_WORK_PERIOD);
+		schedule_delayed_work(&bq24160_chg->charge_work,
+						BQ24160_CHG_WORK_PERIOD);
 	}
 	else 
 	{
@@ -315,6 +313,30 @@ static void bq24160_charge_done(struct work_struct *bq24160_work)
 #endif
 	wake_unlock(&bq24160_chg->wl);
 }
+
+#ifdef BQ24160_HZMODE_CTRL
+static void bq24160_hzmode_ctrl(struct work_struct *bq24160_work)
+{
+    struct bq24160_chip *bq24160_chg;
+
+	bq24160_chg = container_of(bq24160_work, struct bq24160_chip,
+			hzmode_ctrl_work.work);
+
+	dev_dbg(&bq24160_chg->client->dev, "%s\n", __func__);
+
+	if (bq24160_chg->chg_online) 
+	{
+		dev_dbg(&bq24160_chg->client->dev, "%s chg_online, hzmode off\n", __func__);
+		bq24160_write_reg(bq24160_chg->client, BQ24160_REG_CTRL, 0x4C);
+	}
+	else
+	{
+		dev_dbg(&bq24160_chg->client->dev, "%s chg_offline, hzmode on\n", __func__);
+		bq24160_write_reg(bq24160_chg->client, BQ24160_REG_CTRL, 0x4D);
+	}
+	schedule_delayed_work(&bq24160_chg->hzmode_ctrl_work, BQ24160_CHG_WORK_PERIOD);
+}
+#endif
 
 static int __set_charger(struct bq24160_chip *chip, int enable)
 {
@@ -436,7 +458,7 @@ static int bq24160_charger_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = chip->chg_online;
-//		dev_dbg(&chip->client->dev, "%s power_supply online = %d\n", __func__,val->intval);
+		dev_dbg(&chip->client->dev, "%s power_supply online = %d\n", __func__,val->intval);
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
 		ret = bq24160_read_reg(chip->client, BQ24160_REG_STAT_CTRL);
@@ -482,12 +504,6 @@ static struct power_supply bq24160_charger_ps = {
 	.get_property = bq24160_charger_get_property,
 };
 
-int bq24160_get_online(void)
-{
-	return wireless_chg_online;
-}
-EXPORT_SYMBOL(bq24160_get_online);
-
 #ifdef CONFIG_LGE_WIRELESS_CHARGER_BQ24160
 static int bq24160_start_charging(struct msm_hardware_charger *hw_chg,
 		int chg_voltage, int chg_current)
@@ -502,11 +518,9 @@ static int bq24160_start_charging(struct msm_hardware_charger *hw_chg,
 
 	msleep(100);
 	bq24160_chg->chg_online = 1;
-	wireless_chg_online = 1;
 	__set_charger(bq24160_chg, 1);
 	
-	//schedule_delayed_work(&bq24160_chg->charge_work, BQ24160_CHG_WORK_PERIOD);
-	queue_delayed_work(local_charge_wq, &bq24160_chg->charge_work, BQ24160_CHG_WORK_PERIOD);
+	schedule_delayed_work(&bq24160_chg->charge_work, BQ24160_CHG_WORK_PERIOD);
 
 	power_supply_changed(&bq24160_chg->charger);
 
@@ -525,7 +539,6 @@ static int bq24160_stop_charging(struct msm_hardware_charger *hw_chg)
 		return 0;
 
 	bq24160_chg->chg_online = 0;
-	wireless_chg_online = 0;
 	cancel_delayed_work(&bq24160_chg->charge_work);
 
 	power_supply_changed(&bq24160_chg->charger);
@@ -701,6 +714,11 @@ static __devinit int bq24160_probe(struct i2c_client *client,
 	wake_lock_init(&chip->wl, WAKE_LOCK_SUSPEND, "bq24160");
 #endif
 
+#ifdef BQ24160_HZMODE_CTRL
+	INIT_DELAYED_WORK(&chip->hzmode_ctrl_work, bq24160_hzmode_ctrl);
+	schedule_delayed_work(&chip->hzmode_ctrl_work, BQ24160_CHG_WORK_PERIOD);
+#endif
+
 	return 0;
 out:
 	kfree(chip);
@@ -737,28 +755,12 @@ static struct i2c_driver bq24160_i2c_driver = {
 
 static int __init bq24160_init(void)
 {
-	local_charge_wq = create_workqueue("bq24160_charge_work");
-	if(!local_charge_wq)
-		return -ENOMEM;
-	
-	local_charge_done_wq = create_workqueue("bq24160_charge_done_work");
-	if(!local_charge_done_wq)
-		return -ENOMEM;
-	
 	return i2c_add_driver(&bq24160_i2c_driver);
 }
 module_init(bq24160_init);
 
 static void __exit bq24160_exit(void)
 {
-	if(local_charge_wq)
-		destroy_workqueue(local_charge_wq);
-	local_charge_wq = NULL;
-
-	if(local_charge_done_wq)
-		destroy_workqueue(local_charge_done_wq);
-	local_charge_done_wq = NULL;
-	
 	i2c_del_driver(&bq24160_i2c_driver);
 }
 module_exit(bq24160_exit);

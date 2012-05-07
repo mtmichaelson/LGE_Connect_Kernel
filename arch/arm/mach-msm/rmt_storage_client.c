@@ -173,6 +173,7 @@ static struct dentry *stats_dentry;
 
 /* MSM EFS*/
 #define RAMFS_MODEMSTORAGE_ID		0x4D454653
+
 #define RAMFS_SHARED_EFS_RAM_BASE	0x46100000
 #define RAMFS_SHARED_EFS_RAM_SIZE	(3 * 1024 * 1024)
 

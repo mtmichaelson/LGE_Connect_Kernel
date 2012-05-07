@@ -435,14 +435,7 @@ static int worker_thread(void *__cwq)
 {
 	struct cpu_workqueue_struct *cwq = __cwq;
 	DEFINE_WAIT(wait);
-//LGE_BROADCAST_I for change PRIOR.
-#ifdef CONFIG_LGE_BROADCAST
-	if(!strcmp((cwq->wq->name), "spi_qsd.2") || !strcmp((cwq->wq->name), "tdmb_spi_wq"))
-	{
-		set_user_nice(current, -20);		
-	}
-#endif
-//LGE_BROADCAST_I for change PRIOR.	
+
 	if (cwq->wq->freezeable)
 		set_freezable();
 

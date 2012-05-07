@@ -45,40 +45,16 @@
 #define MSM_FB_DSUB_PMEM_ADDER (0)
 #endif
 
-#ifdef CONFIG_FB_MSM_MIPI_DSI
-/* 960 x 540 x 3 x 2 */
-//#define MIPI_DSI_WRITEBACK_SIZE 0x300000
-/* 1280 x 736 x 3 x 2 */
-#define MIPI_DSI_WRITEBACK_SIZE 0x564000
-#else
-#define MIPI_DSI_WRITEBACK_SIZE 0
-#endif
-
-#ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
-/* prim = 1024 x 600 x 4(bpp) x 3(pages) */
-//#define MSM_FB_PRIM_BUF_SIZE 0x708000
-/* prim = 1280 x 736 x 4(bpp) x 3(pages) */
-#define MSM_FB_PRIM_BUF_SIZE 0xAC8000
-#else
-/* prim = 1024 x 600 x 4(bpp) x 2(pages) */
-//#define MSM_FB_PRIM_BUF_SIZE 0x4B0000
-/* prim = 1280 x 736 x 4(bpp) x 2(pages) */
-#define MSM_FB_PRIM_BUF_SIZE 0x730000
-#endif
-
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 /* prim = 1024 x 600 x 4(bpp) x 2(pages)
  * hdmi = 1920 x 1080 x 2(bpp) x 1(page)
  * Note: must be multiple of 4096 */
-/* change FB size for caption : 0x3F4800 -> 0xFD2000 */ 
-#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + 0xFD2000 + MIPI_DSI_WRITEBACK_SIZE + MSM_FB_DSUB_PMEM_ADDER, 4096)
-//#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + 0x3F4800 + MIPI_DSI_WRITEBACK_SIZE + MSM_FB_DSUB_PMEM_ADDER, 4096)
-
+#define MSM_FB_SIZE roundup(0x760000 + 0x3F4800 + MSM_FB_DSUB_PMEM_ADDER, 4096)
 #elif defined(CONFIG_FB_MSM_TVOUT)
 /* prim = 1024 x 600 x 4(bpp) x 2(pages)
  * tvout = 720 x 576 x 2(bpp) x 2(pages)
  * Note: must be multiple of 4096 */
-#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + 0x195000 + MSM_FB_DSUB_PMEM_ADDER, 4096)
+#define MSM_FB_SIZE roundup(0x760000 + 0x195000 + MSM_FB_DSUB_PMEM_ADDER, 4096)
 #else /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 
 #ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
@@ -280,12 +256,6 @@ static int mipi_panel_power(int on)
 		if (IS_ERR(reg_8901_l2)) {
 			reg_8901_l2 = NULL;
 		}
-	}	
-	if (reg_8901_mvs == NULL) {
-		reg_8901_mvs = regulator_get(NULL, "8901_mvs0");
-		if (IS_ERR(reg_8901_mvs)) {
-			reg_8901_mvs = NULL;
-		}
 	}
 	if (reg_8901_l3 == NULL) {
 		reg_8901_l3 = regulator_get(NULL, "8901_l3");
@@ -293,9 +263,15 @@ static int mipi_panel_power(int on)
 			reg_8901_l3 = NULL;
 		}
 	}
+	if (reg_8901_mvs == NULL) {
+		reg_8901_mvs = regulator_get(NULL, "8901_mvs0");
+		if (IS_ERR(reg_8901_mvs)) {
+			reg_8901_mvs = NULL;
+		}
+	}
 
 	if(on){
-		rc = regulator_set_voltage(reg_8901_l2, 3000000, 3000000); // +3V0_LCD_VCC
+		rc = regulator_set_voltage(reg_8901_l2, 3000000, 3000000);
 		if (!rc)
 			rc = regulator_enable(reg_8901_l2);
 		if (rc) {
@@ -304,17 +280,7 @@ static int mipi_panel_power(int on)
 			return rc;
 		}
 		udelay(100); // 100us
-		
-		if (!rc)
-			rc = regulator_enable(reg_8901_mvs); // +1V8_LCD_IO
-		if (rc) {
-			pr_err("'%s' regulator enable failed, rc=%d\n",
-					"8901_mvs", rc);
-			return rc;
-		}
-		udelay(500); // 100us
-
-		rc = regulator_set_voltage(reg_8901_l3, 3000000, 3000000); // +3V0_LCD_VCI
+		rc = regulator_set_voltage(reg_8901_l3, 3000000, 3000000);
 		if (!rc)
 			rc = regulator_enable(reg_8901_l3);
 		if (rc) {
@@ -323,23 +289,31 @@ static int mipi_panel_power(int on)
 			return rc;
 		}
 		udelay(100); // 100us
+		if (!rc)
+			rc = regulator_enable(reg_8901_mvs);
+		if (rc) {
+			pr_err("'%s' regulator enable failed, rc=%d\n",
+					"8901_mvs", rc);
+			return rc;
+		}
+		udelay(100); // 100us
 	}
 	else{
 
-		rc = regulator_disable(reg_8901_l3);
+		rc = regulator_disable(reg_8901_l2);
 		if (rc)
 			pr_warning("'%s' regulator disable failed, rc=%d\n",
 					"8901_l2", rc);
-		udelay(100); // 100us		
+		udelay(100); // 100us
+		rc = regulator_disable(reg_8901_l3);
+		if (rc)
+			pr_warning("'%s' regulator disable failed, rc=%d\n",
+					"8901_l3", rc);
+		udelay(100); // 100us
 		rc = regulator_disable(reg_8901_mvs);
 		if (rc)
 			pr_warning("'%s' regulator disable failed, rc=%d\n",
 					"8901_mvs", rc);
-		udelay(100); // 100us
-		rc = regulator_disable(reg_8901_l2);
-		if (rc)
-			pr_warning("'%s' regulator disable failed, rc=%d\n",
-					"8901_l3", rc);
 		udelay(100); // 100us
 		pr_info("%s(off): success\n", __func__);
 
@@ -392,6 +366,40 @@ static struct platform_device *panel_devices[] __initdata = {
 
 };
 
+#if 0 
+//exponential mode 
+/* backlight */
+/* jaeseong.gim@lge.com. 2011-01-16 
+struct backlight_platform_data {
+   void (*platform_init)(void);
+   int gpio;
+   unsigned int mode;
+   int max_current;
+   int init_on_boot;
+	int min_brightness;
+};
+
+static struct backlight_platform_data lm3530_data = {
+	.gpio = 49,
+	.max_current = 0x11,
+
+	// max_current table 
+	0x01 = 5 mA full-scale current
+	0x05 = 8.5 A full-scale current
+	0x09 = 12 mA full-scale current
+	0x0D = 15.5 mA full-scale current
+	0x11 = 19 mA full-scale current
+	0x15 = 22.5 mA full-scale current
+	0x19 = 26 mA full-scale current
+	0x1D = 29.5 mA full-scale current
+	
+
+	.min_brightness = 0x40,
+};
+*/
+/* jaeseong.gim@lge.com. 2011-01-16 */
+
+#else
 //start, linear mode, shoogi.lee@lge.com, 2011_04_20
 struct backlight_platform_data {
    void (*platform_init)(void);
@@ -419,11 +427,11 @@ static struct backlight_platform_data lm3530_data = {
 	0x1F= 29.5 mA full-scale current
 	*/
 
-	.min_brightness = 0x05, //0x09,
+	.min_brightness = 0x09,
 	.default_brightness = 0x33,
 	.max_brightness = 0x7f,
 };
-
+#endif
 //end, linear mode, shoogi.lee@lge.com, 2011_04_20
 
 #define I2C_SURF 1
@@ -663,8 +671,8 @@ static struct msm_bus_vectors mdp_sd_smi_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_MDP_PORT0,
 		.dst = MSM_BUS_SLAVE_SMI,
-		.ab = 175110000,
-		.ib = 218887500,	
+		.ab = 147460000, //LGE_I_DISP_UNDERRUN
+		.ib = 184325000,
 	},
 	/* Master and slaves can be from different fabrics */
 	{
@@ -687,23 +695,23 @@ static struct msm_bus_vectors mdp_sd_ebi_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_MDP_PORT0,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab = 334080000,   
-		.ib = 417600000 * 2,	
+		.ab = 343080000, //LGE_I_DISP_UNDERRUN
+		.ib = 417600000,
 	},
 };
 static struct msm_bus_vectors mdp_vga_vectors[] = {
 	/* VGA and less video */
 	{
 		.src = MSM_BUS_MASTER_MDP_PORT0,
-		.dst = MSM_BUS_SLAVE_SMI,	
-		.ab = 216000000,
-		.ib = 270000000 * 2,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab = 175110000,
+		.ib = 218887500,
 	},
 	{
 		.src = MSM_BUS_MASTER_MDP_PORT0,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab = 216000000,
-		.ib = 270000000 * 2,
+		.ab = 175110000,
+		.ib = 218887500,
 	},
 };
 
@@ -713,14 +721,14 @@ static struct msm_bus_vectors mdp_720p_vectors[] = {
 		.src = MSM_BUS_MASTER_MDP_PORT0,
 		.dst = MSM_BUS_SLAVE_SMI,
 		.ab = 230400000,
-		.ib = 288000000 * 2,
+		.ib = 288000000,
 	},
 	/* Master and slaves can be from different fabrics */
 	{
 		.src = MSM_BUS_MASTER_MDP_PORT0,
-		.dst = MSM_BUS_SLAVE_EBI_CH0,	
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 230400000,
-		.ib = 288000000 * 2,
+		.ib = 288000000,
 	},
 };
 
@@ -730,14 +738,14 @@ static struct msm_bus_vectors mdp_1080p_vectors[] = {
 		.src = MSM_BUS_MASTER_MDP_PORT0,
 		.dst = MSM_BUS_SLAVE_SMI,
 		.ab = 334080000,
-		.ib = 417600000 * 2,
+		.ib = 417600000,
 	},
 	/* Master and slaves can be from different fabrics */
 	{
 		.src = MSM_BUS_MASTER_MDP_PORT0,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 334080000,
-		.ib = 550000000 * 2,
+		.ib = 417600000,
 	},
 };
 
@@ -902,6 +910,7 @@ static int atv_dac_power(int on)
 
 #ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
 int mdp_core_clk_rate_table[] = {
+	200000000,
 	200000000,
 	200000000,
 	200000000,

@@ -1283,11 +1283,6 @@ struct task_struct {
 #ifndef CONFIG_VIRT_CPU_ACCOUNTING
 	cputime_t prev_utime, prev_stime;
 #endif
-
-#ifdef CONFIG_LG_SYSPROF
-	unsigned int state_flags;
-#endif
-
 	unsigned long nvcsw, nivcsw; /* context switch counts */
 	struct timespec start_time; 		/* monotonic time */
 	struct timespec real_start_time;	/* boot based time */

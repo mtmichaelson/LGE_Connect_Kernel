@@ -769,7 +769,7 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
 {
 #ifdef CONFIG_LGE_PM_CURRENT_CONSUMPTION_FIX
 #ifdef CONFIG_LGE_SENSOR_FUSION
-	if(!strcmp((char*)(handle->dev->name), "accelerometer") || !strcmp((char*)(handle->dev->name), "proximity") || !strcmp((char*)(handle->dev->name), "magnetic_field") || !strcmp((char*)(handle->dev->name), "synaptics_ts"))
+	if(!strcmp((char*)(handle->dev->name), "accelerometer") || !strcmp((char*)(handle->dev->name), "proximity") || !strcmp((char*)(handle->dev->name), "magnetic_field"))
 #else
 	if(!strcmp((char*)(handle->dev->name), "gesture_flip") || !strcmp((char*)(handle->dev->name), "gesture_tap") || !strcmp((char*)(handle->dev->name), "accelerometer") || !strcmp((char*)(handle->dev->name), "proximity") || !strcmp((char*)(handle->dev->name), "magnetic_field"))
 #endif

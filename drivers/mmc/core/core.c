@@ -41,6 +41,12 @@
 
 static struct workqueue_struct *workqueue;
 static struct wake_lock mmc_delayed_work_wake_lock;
+extern unsigned int sdcard_crc_c;
+extern unsigned int sdcard_relative_crc_c;
+extern unsigned int sdcard_datatimeout_c;
+extern unsigned int sdcard_relative_data_c;
+extern unsigned int sdcard_unknown;
+extern unsigned int sdcard_unknown_relative;
 
 /*
  * Enabling software CRCs on the data blocks can be a significant (30%)
@@ -967,7 +973,7 @@ static void mmc_power_up(struct mmc_host *host)
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
 	 */
-	mmc_delay(10);
+	mmc_delay(20);
 
 	host->ios.clock = host->f_min;
 
@@ -978,7 +984,7 @@ static void mmc_power_up(struct mmc_host *host)
 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
 	 * time required to reach a stable voltage.
 	 */
-	mmc_delay(10);
+	mmc_delay(20);
 }
 #ifdef CONFIG_LGE_MMC_WORKAROUND
 EXPORT_SYMBOL(mmc_power_up);
@@ -1530,6 +1536,10 @@ int mmc_resume_host(struct mmc_host *host)
 		memcpy(&host->ios,&ios_backup,sizeof(struct mmc_ios));
 		mmc_set_ios(host);
 		printk("\n(IOS restore)\n%s: clock %uHz busmode %u powermode %u cs %u Vdd %u  width %u timing %u\n",mmc_hostname(host), ios_backup.clock, ios_backup.bus_mode,ios_backup.power_mode, ios_backup.chip_select, ios_backup.vdd,ios_backup.bus_width, ios_backup.timing);
+        printk("\n%s:Data CRC %d ",mmc_hostname(host), sdcard_crc_c );
+        printk("\n%s:Data TMO %d ",mmc_hostname(host), sdcard_datatimeout_c );
+        printk("\n%s:Data Ukn %d \n",mmc_hostname(host), sdcard_unknown);
+
 	}
 	mmc_bus_put(host);
 

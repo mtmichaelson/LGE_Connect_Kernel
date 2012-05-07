@@ -77,6 +77,9 @@
 #define MAX_ENTRY	1
 #define MAX_DELAY	(MAX_ENTRY * 9523809LL)
 
+
+
+
 #define SELF_TEST_ENABLED 
 #ifdef SELF_TEST_ENABLED
 #define TAG_ST			"k3g_self_test"
@@ -97,6 +100,10 @@
 #endif
 #define DRV_NAME    "k3g"
 
+
+
+
+
 /* LGE Debug mask value
 	* usage: echo [mask_value] > /sys/module/k3dh/parameters/debug_mask
 	* All      : 127
@@ -111,7 +118,6 @@ enum {
 	DEBUG_DEV_DEBOUNCE  = 1U << 4,
 	DEBUG_GEN_INFO      = 1U << 5,
 	DEBUG_INTR_INFO     = 1U << 6,
-	DEBUG_DEBUG_SYSFS   = 1U << 7,
 };
 
 static unsigned int debug_mask = DEBUG_USER_ERROR;
@@ -164,8 +170,11 @@ struct k3g_data {
 	u32 time_to_read;	/* time needed to read one entry */
 	ktime_t polling_delay;	/* polling time for timer */
 };
-static struct i2c_client *k3g_i2c_client = NULL;
+//BEGIN:seungkwan.jung
 
+static int gyro_xyz[3]={0,};
+
+//END:seungkwan.jung
 #ifdef FILE_OPS
 #define	K3G_IOCTL_BASE 80
 /** The following define the IOCTL command values via the ioctl macros */
@@ -321,16 +330,21 @@ static int k3g_report_gyro_values(struct k3g_data *k3g_data)
 		return k3g_restart_fifo(k3g_data);
 	}
 
-#ifndef CONFIG_LGE_SENSOR_FUSION
+//#ifndef CONFIG_LGE_SENSOR_FUSION
 	input_report_rel(k3g_data->input_dev, REL_RX, data.x);
 	input_report_rel(k3g_data->input_dev, REL_RY, data.y);
 	input_report_rel(k3g_data->input_dev, REL_RZ, data.z);
 	input_sync(k3g_data->input_dev);
-#else
+//#else
 	k3g_gyro_data[0] = (int) data.x;
 	k3g_gyro_data[1] = (int) data.y;
 	k3g_gyro_data[2] = (int) data.z;
-#endif
+//#endif
+//BEGIN:seungkwan.jung
+	gyro_xyz[0] =  data.x;
+	gyro_xyz[1] =  data.y;
+	gyro_xyz[2] =  data.z;
+//END:seungkwan.jung
 	if(DEBUG_DEV_DEBOUNCE & debug_mask)
 		printk(KERN_INFO "%s: [k3g] x(%d), y(%d), z(%d)\n", __func__, data.x, data.y, data.z);
 	report_cnt++;
@@ -405,8 +419,8 @@ static ssize_t k3g_show_enable(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
 	struct k3g_data *k3g_data  = dev_get_drvdata(dev);
-	if(DEBUG_DEBUG_SYSFS & debug_mask)
-		printk(KERN_INFO "%s: enable(%d)\n", __func__, k3g_data->enable);
+	if(DEBUG_FUNC_TRACE & debug_mask)
+		printk(KERN_INFO "%s: line %d\n", __func__, __LINE__);
 
 	return sprintf(buf, "%d\n", k3g_data->enable);
 }
@@ -415,18 +429,9 @@ static ssize_t k3g_set_enable(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
 	int err = 0;
-	struct k3g_platform_data *pdata;
-	bool new_enable;
 	struct k3g_data *k3g_data  = dev_get_drvdata(dev);
-	struct i2c_client *client = to_i2c_client(dev);
+	bool new_enable;
 
-	pdata = k3g_i2c_client->dev.platform_data;
-	if(pdata == NULL) 
-	{
-	    dev_err(&client->dev, "failed to read platform data\n");
-		err = -ENODEV;
-		return err;
-	}
 
 	if(DEBUG_FUNC_TRACE & debug_mask)
 		printk(KERN_INFO "%s: line %d - enable %s\n", __func__, __LINE__, buf);
@@ -434,14 +439,14 @@ static ssize_t k3g_set_enable(struct device *dev,
 	if (sysfs_streq(buf, "1"))
 	{
 		new_enable = true;
-		if(DEBUG_FUNC_TRACE & debug_mask||DEBUG_DEBUG_SYSFS & debug_mask)		
-			printk(KERN_INFO "%s: line %d - enable\n", __func__, __LINE__);
+		if(DEBUG_FUNC_TRACE & debug_mask)		
+			printk(KERN_INFO "%s: line %d - new_enable true\n", __func__, __LINE__);
     }
 	else if (sysfs_streq(buf, "0"))
 	{
 		new_enable = false;
-		if(DEBUG_FUNC_TRACE & debug_mask||DEBUG_DEBUG_SYSFS & debug_mask)
-			printk(KERN_INFO "%s: line %d - disable\n", __func__, __LINE__);
+		if(DEBUG_FUNC_TRACE & debug_mask)
+			printk(KERN_INFO "%s: line %d - new_enable false\n", __func__, __LINE__);
 	}
 	else 
 	{
@@ -458,12 +463,6 @@ static ssize_t k3g_set_enable(struct device *dev,
 
 	if (new_enable) 
 	{
-		if(pdata->power_on){
-			if(DEBUG_FUNC_TRACE & debug_mask)
-				printk(KERN_INFO "%s: line %d, call power_on", __func__, __LINE__);
-			pdata->power_on(1<<SENSOR_TYPE_GYROSCOPE);
-			mdelay(1);
-		}
 		/* turning on */
 		err = i2c_smbus_write_i2c_block_data(k3g_data->client,
 			CTRL_REG1 | AC, sizeof(k3g_data->ctrl_regs),
@@ -477,8 +476,6 @@ static ssize_t k3g_set_enable(struct device *dev,
 			goto unlock;
 		}
 
-		mdelay(300);
-		
 		/* reset fifo entries */
 		err = k3g_restart_fifo(k3g_data);
 		if (err < 0) 
@@ -594,24 +591,6 @@ static struct miscdevice k3g_misc_device = {
 };
 #endif
 
-static ssize_t k3g_show_gyro_data(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	char strbuf[256];
-	struct k3g_data *k3g_data  = dev_get_drvdata(dev);
-	if(DEBUG_DEBUG_SYSFS & debug_mask)
-	{
-		if(k3g_data->enable)	
-			printk(KERN_INFO "%s: %d, %d, %d\n", __func__, k3g_gyro_data[0], k3g_gyro_data[1], k3g_gyro_data[2]);
-		else
-			printk(KERN_INFO "%s: %d, %d, %d\n", __func__, -1, -1, -1);	
-	}
-	if(k3g_data->enable)
-		sprintf(strbuf, "%d %d %d", k3g_gyro_data[0], k3g_gyro_data[1], k3g_gyro_data[2]);
-	else
-		sprintf(strbuf, "%d %d %d", -1, -1, -1);
-	return sprintf(buf, "%s\n", strbuf);
-}
 static ssize_t k3g_show_delay(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
@@ -984,22 +963,48 @@ exit_self_test:
 	return err ? err : size;
 }
 #endif
+//BEGIN:seungkwan.jung
+static ssize_t data_x(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+	
+	return sprintf(buf, "%d\n",gyro_xyz[0]);
+}
+
+static ssize_t data_y(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+	
+	return sprintf(buf, "%d\n", gyro_xyz[1]);
+}
+
+static ssize_t data_z(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+	
+	return sprintf(buf, "%d\n", gyro_xyz[2]);
+}
+
 static ssize_t k3g_show_report_cnt(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	struct k3g_data *k3g_data  = dev_get_drvdata(dev);
-	printk(KERN_INFO "%s: report_cnt: %d\n", __func__, report_cnt);
-	if( k3g_data->enable)
+	//struct k3g_data *k3g_data  = dev_get_drvdata(dev);
+	//printk(KERN_INFO "%s: report_cnt: %d\n", __func__, report_cnt);
+	//if( k3g_data->enable)
 		return sprintf(buf, "%d\n", report_cnt);
-	else
-		return sprintf(buf, "%d\n", -1);
+	//else
+	//	return sprintf(buf, "%d\n", -1);
 }
-static DEVICE_ATTR(enable, /*S_IRUGO | S_IWUSR | S_IWGRP,*/S_IRUGO|S_IWUSR,
+
+
+static DEVICE_ATTR(X, S_IRUGO, data_x, NULL);
+static DEVICE_ATTR(Y, S_IRUGO, data_y, NULL);
+static DEVICE_ATTR(Z, S_IRUGO, data_z, NULL);
+//END:seungkwan.jung
+static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR | S_IWGRP,
 			k3g_show_enable, k3g_set_enable);
-static DEVICE_ATTR(poll_delay, /*S_IRUGO | S_IWUSR | S_IWGRP,*/S_IRUGO|S_IWUSR,
+static DEVICE_ATTR(poll_delay, S_IRUGO | S_IWUSR | S_IWGRP,
 			k3g_show_delay, k3g_set_delay);
-static DEVICE_ATTR(gyro_data, /*S_IRUGO | S_IWUSR | S_IWGRP,*/S_IRUGO|S_IWUSR,
-			k3g_show_gyro_data, NULL);
-static DEVICE_ATTR(gyro_cnt, /*S_IRUGO | S_IWUSR | S_IWGRP,*/S_IRUGO|S_IWUSR,
+static DEVICE_ATTR(gyro_cnt, S_IRUGO,
 			k3g_show_report_cnt, NULL);
 
 #ifdef SELF_TEST_ENABLED
@@ -1007,12 +1012,18 @@ static DEVICE_ATTR(self_test, S_IRUGO | S_IWUSR | S_IWGRP,
 			k3g_show_st_result, k3g_run_self_test);
 static struct attribute *k3g_attributes[] = 
 {
+//BEGIN:seungkwan.jung
+	&dev_attr_X.attr,
+	&dev_attr_Y.attr,
+	&dev_attr_Z.attr,
+//END:seungkwan.jung
+
+	
 	&dev_attr_enable.attr,
 	&dev_attr_poll_delay.attr,
 #ifdef SELF_TEST_ENABLED
 	&dev_attr_self_test.attr,
 #endif
-	&dev_attr_gyro_data.attr,
 	&dev_attr_gyro_cnt.attr,
 	NULL
 };
@@ -1041,7 +1052,6 @@ static int k3g_probe(struct i2c_client *client,
 	if(DEBUG_FUNC_TRACE & debug_mask)
 		printk(KERN_INFO "%s: line %d", __func__, __LINE__);
 
-	k3g_i2c_client = client;
 
 	/* device data setting */
 	pdata = client->dev.platform_data;
@@ -1187,13 +1197,6 @@ static int k3g_probe(struct i2c_client *client,
 	}
 
 	if (device_create_file(&input_dev->dev,
-				&dev_attr_gyro_data) < 0) {
-		pr_err("Failed to create device file(%s)!\n",
-				dev_attr_gyro_data.attr.name);
-		goto err_device_create_file4;
-	}
-	
-	if (device_create_file(&input_dev->dev,
 				&dev_attr_gyro_cnt) < 0) {
 		pr_err("Failed to create device file(%s)!\n",
 				dev_attr_gyro_cnt.attr.name);
@@ -1257,7 +1260,6 @@ static int k3g_remove(struct i2c_client *client)
 
 	device_remove_file(&k3g_data->input_dev->dev, &dev_attr_enable);
 	device_remove_file(&k3g_data->input_dev->dev, &dev_attr_poll_delay);
-	device_remove_file(&k3g_data->input_dev->dev, &dev_attr_gyro_data);
 	device_remove_file(&k3g_data->input_dev->dev, &dev_attr_gyro_cnt);
 #ifdef SELF_TEST_ENABLED
 	device_remove_file(&k3g_data->input_dev->dev, &dev_attr_self_test); 
@@ -1266,6 +1268,11 @@ static int k3g_remove(struct i2c_client *client)
 #ifdef FILE_OPS
 	misc_deregister(&k3g_misc_device);
 #endif
+//BEGIN:seungkwan.jung
+	device_remove_file(&k3g_data->input_dev->dev, &dev_attr_X);
+	device_remove_file(&k3g_data->input_dev->dev, &dev_attr_Y);
+	device_remove_file(&k3g_data->input_dev->dev, &dev_attr_Z);
+//END:seungkwan.jung
 
 	if (k3g_data->enable)
 		err = i2c_smbus_write_byte_data(k3g_data->client,

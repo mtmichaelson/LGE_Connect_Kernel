@@ -70,10 +70,7 @@
 /* prim = 1024 x 600 x 4(bpp) x 2(pages)
  * hdmi = 1920 x 1080 x 2(bpp) x 1(page)
  * Note: must be multiple of 4096 */
-/* change FB size for caption : 0x3F4800 -> 0xFD2000 */ 
-#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + 0xFD2000 + MIPI_DSI_WRITEBACK_SIZE + MSM_FB_DSUB_PMEM_ADDER, 4096)
-//#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + 0x3F4800 + MIPI_DSI_WRITEBACK_SIZE + MSM_FB_DSUB_PMEM_ADDER, 4096)
-
+#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + 0x3F4800 + MIPI_DSI_WRITEBACK_SIZE + MSM_FB_DSUB_PMEM_ADDER, 4096)
 #elif defined(CONFIG_FB_MSM_TVOUT)
 /* prim = 1024 x 600 x 4(bpp) x 2(pages)
  * tvout = 720 x 576 x 2(bpp) x 2(pages)
@@ -84,6 +81,71 @@
 #define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE +  \
 			MIPI_DSI_WRITEBACK_SIZE + MSM_FB_DSUB_PMEM_ADDER, 4096)
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
+
+#define MSM_PMEM_SF_SIZE 0x4000000 /* 64 Mbytes */
+
+#define MSM_PMEM_KERNEL_EBI1_SIZE  0x600000
+#define MSM_PMEM_ADSP_SIZE         0x2000000
+#define MSM_PMEM_AUDIO_SIZE        0x279000
+
+#define MSM_SMI_BASE          0x38000000
+/* Kernel SMI PMEM Region for video core, used for Firmware */
+/* and encoder,decoder scratch buffers */
+/* Kernel SMI PMEM Region Should always precede the user space */
+/* SMI PMEM Region, as the video core will use offset address */
+/* from the Firmware base */
+#define PMEM_KERNEL_SMI_BASE  (MSM_SMI_BASE)
+#define PMEM_KERNEL_SMI_SIZE  0x600000
+/* User space SMI PMEM Region for video core*/
+/* used for encoder, decoder input & output buffers  */
+#define MSM_PMEM_SMIPOOL_BASE (PMEM_KERNEL_SMI_BASE + PMEM_KERNEL_SMI_SIZE)
+#define MSM_PMEM_SMIPOOL_SIZE 0x3A00000
+
+static unsigned fb_size = MSM_FB_SIZE;
+static int __init fb_size_setup(char *p)
+{
+	fb_size = memparse(p, NULL);
+	return 0;
+}
+early_param("fb_size", fb_size_setup);
+
+#ifdef CONFIG_KERNEL_PMEM_EBI_REGION
+static unsigned pmem_kernel_ebi1_size = MSM_PMEM_KERNEL_EBI1_SIZE;
+static int __init pmem_kernel_ebi1_size_setup(char *p)
+{
+	pmem_kernel_ebi1_size = memparse(p, NULL);
+	return 0;
+}
+early_param("pmem_kernel_ebi1_size", pmem_kernel_ebi1_size_setup);
+#endif
+
+#ifdef CONFIG_ANDROID_PMEM
+static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
+static int __init pmem_sf_size_setup(char *p)
+{
+	pmem_sf_size = memparse(p, NULL);
+	return 0;
+}
+early_param("pmem_sf_size", pmem_sf_size_setup);
+
+static unsigned pmem_adsp_size = MSM_PMEM_ADSP_SIZE;
+
+static int __init pmem_adsp_size_setup(char *p)
+{
+	pmem_adsp_size = memparse(p, NULL);
+	return 0;
+}
+early_param("pmem_adsp_size", pmem_adsp_size_setup);
+
+static unsigned pmem_audio_size = MSM_PMEM_AUDIO_SIZE;
+
+static int __init pmem_audio_size_setup(char *p)
+{
+	pmem_audio_size = memparse(p, NULL);
+	return 0;
+}
+early_param("pmem_audio_size", pmem_audio_size_setup);
+#endif
 
 static struct resource msm_fb_resources[] = {
 	{
@@ -430,12 +492,13 @@ struct backlight_platform_data {
    int max_current;
    int init_on_boot;
    int min_brightness;
+   int default_brightness;
    int max_brightness;   
 };
 
 static struct backlight_platform_data lm3530_data = {
 	.gpio = 49,
-	.max_current = 0xb7, //0x17, // CABC
+	.max_current = 0x17,
 
 	/* max_current table - linear mapping
 	0x03 = 5 mA full-scale current
@@ -449,6 +512,7 @@ static struct backlight_platform_data lm3530_data = {
 	*/
 
 	.min_brightness = 0x05, //0x09,
+	.default_brightness = 0x33,
 	.max_brightness = 0x71,
 };
 
@@ -916,9 +980,9 @@ int mdp_core_clk_rate_table[] = {
 };
 #else
 int mdp_core_clk_rate_table[] = {
-	59080000,
-	59080000,
-	85330000,
+	128000000,
+	128000000,
+	128000000,
 	200000000,
 	200000000,
 };
@@ -929,7 +993,7 @@ static struct msm_panel_common_pdata mdp_pdata = {
 #ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
 	.mdp_core_clk_rate = 200000000,
 #else
-	.mdp_core_clk_rate = 59080000,
+	.mdp_core_clk_rate = 128000000,
 #endif
 	.mdp_core_clk_table = mdp_core_clk_rate_table,
 	.num_mdp_clk = ARRAY_SIZE(mdp_core_clk_rate_table),

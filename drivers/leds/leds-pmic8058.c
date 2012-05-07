@@ -64,7 +64,6 @@ struct pmic8058_led_data {
 static struct pmic8058_led_data led_data[PM8058_MAX_LEDS];
 
 #ifdef CONFIG_LGE_PM_FACTORY_CURRENT_DOWN
-extern uint16_t battery_info_get(void);
 extern int usb_cable_info;
 #endif
 
@@ -75,7 +74,7 @@ static void kp_bl_set(struct pmic8058_led_data *led, enum led_brightness value)
 	unsigned long flags;
 
 #ifdef CONFIG_LGE_PM_FACTORY_CURRENT_DOWN
-	if((0 == battery_info_get())&&((usb_cable_info == 6) ||(usb_cable_info == 7)||(usb_cable_info == 11)))
+	if((usb_cable_info == 6) ||(usb_cable_info == 7)||(usb_cable_info == 11))
 	{
 		pr_err("%s: can't set keypad backlight level in factory mode \n", __func__);
         return;
@@ -87,6 +86,10 @@ static void kp_bl_set(struct pmic8058_led_data *led, enum led_brightness value)
         value = led->cdev.max_brightness;
 #endif
 	spin_lock_irqsave(&led->value_lock, flags);
+#ifdef CONFIG_LGE_PMIC8058_KEYPAD
+	if (value != LED_OFF) 
+		value =1;
+#endif
 	level = (value << PM8058_DRV_KEYPAD_BL_SHIFT) &
 				 PM8058_DRV_KEYPAD_BL_MASK;
 
@@ -211,6 +214,10 @@ int pm8058_set_flash_led_current(enum pmic8058_leds id, unsigned mA)
 }
 EXPORT_SYMBOL(pm8058_set_flash_led_current);
 
+#if defined(CONFIG_LGE_KEY_BACKLIGHT_ALC)
+extern int key_light_luxValue;
+#endif
+
 int pm8058_set_led_current(enum pmic8058_leds id, unsigned mA)
 {
 	struct pmic8058_led_data *led;
@@ -244,7 +251,13 @@ int pm8058_set_led_current(enum pmic8058_leds id, unsigned mA)
 		if (brightness  > led->cdev.max_brightness)
 			return -EINVAL;
 		if (id == PMIC8058_ID_LED_KB_LIGHT)
+		{			
+#if defined(CONFIG_LGE_KEY_BACKLIGHT_ALC)
+			if(key_light_luxValue > 100)
+				brightness =0;
+#endif
 			kp_bl_set(led, brightness);
+		}
 		else
 			led_flash_set(led, brightness);
 		break;
@@ -277,7 +290,7 @@ static void pmic8058_led_work(struct work_struct *work)
 
 	switch (led->id) {
 	case PMIC8058_ID_LED_KB_LIGHT:
-		kp_bl_set(led, led->brightness);
+		//kp_bl_set(led, led->brightness);
 		break;
 	case PMIC8058_ID_LED_0:
 	case PMIC8058_ID_LED_1:

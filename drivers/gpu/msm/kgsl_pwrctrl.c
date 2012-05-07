@@ -27,10 +27,6 @@
 #include "kgsl_log.h"
 
 #define SWITCH_OFF		200
-#ifndef QCT_PATCH_GPU_TZ_SKIP
-#define SWITCH_OFF_RESET_TH 40
-#define SKIP_COUNTER	500
-#endif
 #define TZ_UPDATE_ID		0x01404000
 #define TZ_RESET_ID		0x01403000
 #define UPDATE_BUSY_VAL	1000000
@@ -345,21 +341,8 @@ static void kgsl_pwrctrl_idle_calc(struct kgsl_device *device)
 	/* If the GPU has stayed in turbo mode for a while, *
 	 * stop writing out values. */
 	if (pwr->active_pwrlevel == 0) {
-#ifndef QCT_PATCH_GPU_TZ_SKIP
-		if (pwr->no_switch_cnt > SWITCH_OFF) {
-			pwr->skip_cnt++;
-			if (pwr->skip_cnt > SKIP_COUNTER) {
-				pwr->no_switch_cnt -= SWITCH_OFF_RESET_TH;
-				pwr->skip_cnt = 0;
-			}
- 			return;
-		}
-
-#else
 		if (pwr->no_switch_cnt > SWITCH_OFF)
 			return;
-#endif			
-		
 		pwr->no_switch_cnt++;
 	} else {
 		pwr->no_switch_cnt = 0;
@@ -609,10 +592,6 @@ int kgsl_pwrctrl_init(struct kgsl_device *device)
 					   gpu_freq) : 0;
 		pwr->pwrlevels[i].bus_freq =
 			pdata_pwr->pwrlevel[i].bus_freq;
-#ifndef QCT_PATCH_GPU_IO_FRACTION
-		pwr->pwrlevels[i].io_fraction =
-			pdata_pwr->pwrlevel[i].io_fraction;
-#endif
 	}
 	/* Do not set_rate for targets in sync with AXI */
 	if (pwr->pwrlevels[0].gpu_freq > 0)

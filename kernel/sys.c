@@ -289,8 +289,9 @@ void emergency_restart(void)
 }
 EXPORT_SYMBOL_GPL(emergency_restart);
 
-#ifndef CONFIG_LGE_KERNEL_SYSTEM_STATE 
+#ifndef CONFIG_LGE_KERNEL_SYSTEM_STATE
 static enum system_states lge_kernel_system_state = SYSTEM_RUNNING; 
+
 void lge_set_kernel_shutdown_nofityed(enum system_states state) 
  { 
          lge_kernel_system_state = state; 
@@ -304,9 +305,9 @@ int lge_get_kernel_shutdown_nofityed(void)
           
          switch(lge_kernel_system_state) 
          { 
-                 case SYSTEM_HALT: 
+                 //case SYSTEM_HALT: 
                  case SYSTEM_RESTART: 
-                 case SYSTEM_POWER_OFF: 
+                 //case SYSTEM_POWER_OFF: 
                          is_kernel_shutdown_notified = 1; 
                          printk("%s : shutdown_notified! state : %d\n", __func__, lge_kernel_system_state); 
                          break; 
@@ -323,11 +324,9 @@ void kernel_restart_prepare(char *cmd)
 {
 	blocking_notifier_call_chain(&reboot_notifier_list, SYS_RESTART, cmd);
 	system_state = SYSTEM_RESTART;
-
-	#ifndef CONFIG_LGE_KERNEL_SYSTEM_STATE 
+#ifndef CONFIG_LGE_KERNEL_SYSTEM_STATE
 	lge_set_kernel_shutdown_nofityed(system_state);
-	#endif
-
+#endif
 	device_shutdown();
 	sysdev_shutdown();
 }
@@ -358,11 +357,9 @@ static void kernel_shutdown_prepare(enum system_states state)
 	printk(KERN_EMERG "kernel_shutdown_prepare.\n");
 
 	system_state = state;
-
-	#ifndef CONFIG_LGE_KERNEL_SYSTEM_STATE 
+#ifndef CONFIG_LGE_KERNEL_SYSTEM_STATE
 	lge_set_kernel_shutdown_nofityed(system_state);
-	#endif
-
+#endif
 	device_shutdown();
 }
 /**

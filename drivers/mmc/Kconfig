@@ -34,6 +34,14 @@ config LGE_MMC_WORKAROUND
 	help
 	  This enables LGE MMC work-around codes to make stable
 
+config LGE_REMOVE_ERROR
+	bool "LGE_REMOVE_ERROR"
+	depends on MACH_LGE_I_BOARD
+	default n
+	help
+	  This enables LGE_REMOVE_ERROR codes to Detect MSM_SDCC status
+
+
 if MMC
 
 source "drivers/mmc/core/Kconfig"

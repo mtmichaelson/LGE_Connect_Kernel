@@ -157,7 +157,6 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 	/* MDP cmd block enable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	if (is_mdp4_hw_reset()) {
-		printk(KERN_INFO "%s: mdp4_hw_init .. \n", __func__);
 		mdp4_hw_init();
 		outpdw(MDP_BASE + 0x0038, mdp4_display_intf);
 	}
@@ -506,7 +505,6 @@ void mdp4_overlay_dsi_video_vsync_push(struct msm_fb_data_type *mfd,
 		mdp4_overlay_dsi_video_wait4event(mfd, INTR_DMA_P_DONE);
 	} else {
 		mdp4_overlay_dsi_video_wait4event(mfd, INTR_DMA_P_DONE);
-		/* change mdp clk while mdp is idle */
 		mdp4_set_perf_level();
 	}
 }
@@ -667,5 +665,6 @@ void mdp4_dsi_video_overlay(struct msm_fb_data_type *mfd)
 	mdp4_overlay_reg_flush(pipe, 1);
 	mdp4_overlay_dsi_video_vsync_push(mfd, pipe);
 	mutex_unlock(&mfd->dma->ov_mutex);
+	yield();
 	mdp4_stat.kickoff_dsi++;
 }

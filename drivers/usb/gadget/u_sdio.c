@@ -1330,31 +1330,28 @@ void atcmd_free_req(struct atcmd_request *req)
 #define ATCMD_TO_CP 1
 
 static const char *atcmd_ap[] = {
-    "+VZWAPNE", // jeongro.lee@lge.com 20110708
+
     "+MTC", "%ACS","%READY", "%AVR", "%BATL", "%BOFF", "%CAM", "%CHARGE", "%CHCOMP",
     "%DBCOPY", "%DBCRC", "%DBCHK", "%DBDUMP", "%DRMCERT", "%DRMERASE",
     "%DRMINDEX", "%DRMTYPE", "%ECALL", "%EMT", "%FBOOT", "%FILECRC", "%FKPD", "%FLIGHT",
-    "%FMR", "%FPRICRC", "%FRST", "%FRSTSTATUS", "%FUELRST", "%FUELVAL", "%GKPD", 
-    "%LANG", "%LCD", "%LEDON", "%MAC", "%MACCK", "%MMCDDATADEL", "%MMCDEFULTSIZE","%QEM",
-    "%MMCFORMAT", "%MMCTOTALSIZE", "%MMCUSEDSIZE", "%MOT", "%MPT", "%NCM", "%PMRST", "%OSVER", 
-	"%PROXIMITY", "%ALC", "%ACCEL", "%COMPASS", "%GYRO",
+    "%FMR", "%FPRICRC", "%FRST", "%FRSTSTATUS", "%FUELRST", "%FUELVAL", "%GKPD",
+    "%LANG", "%LCD", "%LEDON", "%MAC", "%MACCK", "%MMCDDATADEL", "%MMCDEFULTSIZE",
+    "%MMCFORMAT", "%MMCTOTALSIZE", "%MMCUSEDSIZE", "%MOT", "%MPT", "%NCM", "%PMRST", "%OSVER", "%QEM", "%PROXIMITY",
     "%RESTART", "%SPM", "%SURV", "%SWVCHECK", "%VLC", "%USBSW", "%WLAN", "%WLANR", "%WLANT", 
 #ifdef CONFIG_LGE_FELICA
     "%IMA", "%IDM", "%EXTIDM", "%FELICATX", "%SWITCH", "%FREQCAL", "%RFIDCK",
 #endif
+//Add for TDMB AT Commnad START
+	"%MTV", 
+//Add for TDMB AT Commnad END soo.seomoon@lge.com
+//20110708, seunghyup.ryoo@lge.com,  [START]
+#if defined(CONFIG_LGE_NFC_NXP_PN544PN65N)
+	"%NFC",
 //[LG_BTUI](ATCMD_TESTMODE) Add for BT AT Command  
 	"%BTTM","%BTAD",
-//[LG_BTUI](ATCMD_TESTMODE) minwoo2.kim@lge.com  
-
-    "+CSS",
-    "+CSO", "+CTSA",
-
-//[START][WEBDL] jongan.kim - 2011.09.08
-  "%LGANDROID", "%LGATSERVICE", "%PNUM",
-//[END][WEBDL] jongan.kim - 2011.09.08
-//20110920 johny.kim@lge.com MLT
-  "%MLT",
-//20110920 johny.kim@lge.com MLT
+//[LG_BTUI](ATCMD_TESTMODE) minwoo2.kim@lge.com 
+#endif
+//20110708, seunghyup.ryoo@lge.com,  [END]
     NULL
 };
 
@@ -1383,7 +1380,7 @@ int atcmd_to(const char *buf, size_t count)
         if (!strcasecmp(&atcmd_name[2], atcmd_ap[i]))
         {
             if ((p = strchr(buf, '=')) || (p = strchr(buf, '?')))
-            {
+        {
                 strncpy(atcmd_state, p, count);
                 p = strchr(atcmd_state, '\r');
                 *p = '\0';
@@ -1393,12 +1390,12 @@ int atcmd_to(const char *buf, size_t count)
                 atcmd_state[0] = '\0';
             }
 
-            pr_info("%s: ATCMD_TO_AP: matching!!! %s, %s\n", __func__, atcmd_name, atcmd_state);
+//            pr_info("%s: ATCMD_TO_AP: matching!!! %s, %s\n", __func__, atcmd_name, atcmd_state);
             return ATCMD_TO_AP;
         }
     }
 
-    pr_info("%s: ATCMD_TO_CP\n", __func__);
+//    pr_info("%s: ATCMD_TO_CP\n", __func__);
     return ATCMD_TO_CP;
 }
 
@@ -1490,7 +1487,7 @@ ssize_t atcmd_queue(const char *buf, size_t count)
             remain--;
         }
         *p2 = '\0';
-        pr_info("%s: [%d][%s]\n", __func__, req->length, tmp);
+//        pr_info("%s: [%d][%s]\n", __func__, req->length, tmp);
         kfree(tmp);
     }
 

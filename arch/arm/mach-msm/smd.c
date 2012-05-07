@@ -984,7 +984,7 @@ static int smd_stream_write(smd_channel_t *ch, const void *_data, int len,
 	unsigned xfer;
 	int orig_len = len;
 	int r = 0;
-
+    unsigned char is_pause = 0;
 	SMD_DBG("smd_stream_write() %d -> ch%d\n", len, ch->n);
 	if (len < 0)
 		return -EINVAL;
@@ -992,8 +992,12 @@ static int smd_stream_write(smd_channel_t *ch, const void *_data, int len,
 		return 0;
 
 	while ((xfer = ch_write_buffer(ch, &ptr)) != 0) {
-		if (!ch_is_open(ch))
+		if (!ch_is_open(ch)) {
+            // start video recording reset [start]
+            is_pause = 1;
+            // end video recording reset [end]
 			break;
+        }
 		if (xfer > len)
 			xfer = len;
 		if (user_buf) {
@@ -1013,10 +1017,10 @@ static int smd_stream_write(smd_channel_t *ch, const void *_data, int len,
 		if (len == 0)
 			break;
 	}
-
-	if (orig_len - len)
+    // start video recording reset [start]
+	if (orig_len - len && is_pause == 0)
 		ch->notify_other_cpu();
-
+     // end video recording reset [end]
 	return orig_len - len;
 }
 

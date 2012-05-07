@@ -33,8 +33,6 @@
  * HEADSET_NAME_PATH = /sys/class/switch/h2w/name
  */
 
-#define CONFIG_FSA8008_USE_LOCAL_WORK_QUEUE
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -50,7 +48,83 @@
 #include <linux/hrtimer.h>
 #include <linux/input.h>
 #include <linux/debugfs.h>
-#include <linux/wakelock.h>
+#include <linux/proc_fs.h>
+#include<linux/module.h>
+#include<linux/kernel.h>
+#include<linux/proc_fs.h>
+#include<linux/file.h>
+#include<asm/uaccess.h>
+#include<linux/fs.h>
+#include<linux/fcntl.h>
+#include<linux/init.h>
+#include <linux/types.h>
+#include <linux/module.h>
+#include <linux/proc_fs.h>
+#include <linux/kernel.h>
+#include <linux/syscalls.h>
+#include <linux/stackprotector.h>
+#include <linux/string.h>
+#include <linux/ctype.h>
+#include <linux/delay.h>
+#include <linux/ioport.h>
+#include <linux/init.h>
+#include <linux/smp_lock.h>
+#include <linux/initrd.h>
+#include <linux/bootmem.h>
+#include <linux/acpi.h>
+#include <linux/tty.h>
+#include <linux/percpu.h>
+#include <linux/kmod.h>
+#include <linux/vmalloc.h>
+#include <linux/kernel_stat.h>
+#include <linux/start_kernel.h>
+#include <linux/security.h>
+#include <linux/smp.h>
+#include <linux/workqueue.h>
+#include <linux/profile.h>
+#include <linux/rcupdate.h>
+#include <linux/moduleparam.h>
+#include <linux/kallsyms.h>
+#include <linux/writeback.h>
+#include <linux/cpu.h>
+#include <linux/cpuset.h>
+#include <linux/cgroup.h>
+#include <linux/efi.h>
+#include <linux/tick.h>
+#include <linux/interrupt.h>
+#include <linux/taskstats_kern.h>
+#include <linux/delayacct.h>
+#include <linux/unistd.h>
+#include <linux/rmap.h>
+#include <linux/mempolicy.h>
+#include <linux/key.h>
+#include <linux/buffer_head.h>
+#include <linux/page_cgroup.h>
+#include <linux/debug_locks.h>
+#include <linux/debugobjects.h>
+#include <linux/lockdep.h>
+#include <linux/kmemleak.h>
+#include <linux/pid_namespace.h>
+#include <linux/device.h>
+#include <linux/kthread.h>
+#include <linux/sched.h>
+#include <linux/signal.h>
+#include <linux/idr.h>
+#include <linux/kgdb.h>
+#include <linux/ftrace.h>
+#include <linux/async.h>
+#include <linux/kmemcheck.h>
+#include <linux/kmemtrace.h>
+#include <linux/sfi.h>
+#include <linux/shmem_fs.h>
+#include <linux/slab.h>
+#include <trace/boot.h>
+
+#include <asm/io.h>
+#include <asm/bugs.h>
+#include <asm/setup.h>
+#include <asm/sections.h>
+#include <asm/cacheflush.h>
 
 #include "fsa8008.h"
 
@@ -58,9 +132,14 @@
 #define LGE_HSD_DEBUG_PRINT // TODO
 #undef  LGE_HSD_ERROR_PRINT
 #define LGE_HSD_ERROR_PRINT
+#define EW0804_Button_enable
+
+//EW0804
+#define EARJACK_FILENAME "/data/earjack_flag"
+
 
 /* TODO */
-/* 1. coding for additional exception case in probe function */
+/* 1. coding for additional excetion case in probe function */
 /* 2. additional sleep related/excetional case  */
 
 #if defined(LGE_HSD_DEBUG_PRINT)
@@ -74,12 +153,6 @@
 #else
 #define HSD_ERR(fmt, args...) do {} while(0)
 #endif
-
-#ifdef CONFIG_FSA8008_USE_LOCAL_WORK_QUEUE
-static struct workqueue_struct *local_fsa8008_workqueue;
-#endif
-
-static struct wake_lock ear_hook_wake_lock;
 
 struct hsd_info {
 /* function devices provided by this driver */
@@ -98,7 +171,6 @@ struct hsd_info {
 	void (*set_headset_mic_bias)(int enable); /* callback function which is initialized while probing */
 
 	unsigned int latency_for_detection;
-	unsigned int latency_for_key;
 
 	unsigned int key_code;
 
@@ -110,9 +182,7 @@ struct hsd_info {
 	atomic_t is_3_pole_or_not;
 	atomic_t btn_state;
 /* work for detect_work */
-	struct delayed_work work;
-	struct delayed_work work_for_key_pressed;
-	struct delayed_work work_for_key_released;
+	struct work_struct work;
 };
 
 enum {
@@ -164,7 +234,7 @@ ssize_t hookkeylog_store_onoff(struct device *dev, struct device_attribute *attr
 }
 
 
-DEVICE_ATTR(hookkeylog, 0664, hookkeylog_show_onoff, hookkeylog_store_onoff);
+DEVICE_ATTR(hookkeylog, 0666, hookkeylog_show_onoff, hookkeylog_store_onoff);
 
 #endif
 
@@ -191,19 +261,8 @@ static ssize_t lge_hsd_print_state(struct switch_dev *sdev, char *buf)
 	return sprintf(buf, "%d\n", switch_get_state(sdev));
 }
 
-static void button_pressed(struct work_struct *work)
+static void button_pressed(struct hsd_info *hi)
 {
-	struct delayed_work *dwork = container_of(work, struct delayed_work, work);
-	struct hsd_info *hi = container_of(dwork, struct hsd_info, work_for_key_pressed);
-
-//	msleep(1);
-
-	//if (gpio_get_value_cansleep(hi->gpio_detect)){
-	if (gpio_get_value_cansleep(hi->gpio_detect) && (switch_get_state(&hi->sdev)== LGE_HEADSET)){
-		HSD_ERR("button_pressed but ear jack is plugged out already! just ignore the event.\n");
-		return;
-	}
-
 	HSD_DBG("button_pressed \n");
 
 	atomic_set(&hi->btn_state, 1);
@@ -217,22 +276,25 @@ static void button_pressed(struct work_struct *work)
 	input_sync(hi->input);
 }
 
-static void button_released(struct work_struct *work)
+static void button_released(struct hsd_info *hi)
 {
-	struct delayed_work *dwork = container_of(work, struct delayed_work, work);
-	struct hsd_info *hi = container_of(dwork, struct hsd_info, work_for_key_released);
-
-	//if (gpio_get_value_cansleep(hi->gpio_detect)){
-	if (gpio_get_value_cansleep(hi->gpio_detect) && (switch_get_state(&hi->sdev)== LGE_HEADSET)){
-		HSD_ERR("button_released but ear jack is plugged out already! just ignore the event.\n");
-		return;
-	}
-
 	HSD_DBG("button_released \n");
 
+#ifdef EW0804_Button_enable
+
+	if(!gpio_get_value_cansleep(hi->gpio_jpole) && !gpio_get_value_cansleep(hi->gpio_detect))
+	{
+		atomic_set(&hi->btn_state, 0);
+		input_report_key(hi->input, hi->key_code, 0);
+		input_sync(hi->input);
+	}
+	else
+		printk("button_released ignore!!!\n");
+#else
 	atomic_set(&hi->btn_state, 0);
 	input_report_key(hi->input, hi->key_code, 0);
 	input_sync(hi->input);
+#endif
 }
 
 static void insert_headset(struct hsd_info *hi)
@@ -304,30 +366,22 @@ static void remove_headset(struct hsd_info *hi)
 	}
 
 	if (atomic_read(&hi->btn_state))
-#ifdef	CONFIG_FSA8008_USE_LOCAL_WORK_QUEUE
-	queue_delayed_work(local_fsa8008_workqueue, &(hi->work_for_key_released), hi->latency_for_key );
-#else
-	schedule_delayed_work(&(hi->work_for_key_released), hi->latency_for_key );
-#endif
+		button_released(hi);
 
 }
 
 static void detect_work(struct work_struct *work)
 {
 	int state;
-	#if 0
 	unsigned long irq_flags;
-	#endif
-	struct delayed_work *dwork = container_of(work, struct delayed_work, work);
-	struct hsd_info *hi = container_of(dwork, struct hsd_info, work);
+
+	struct hsd_info *hi = container_of(work, struct hsd_info, work);
 
 	HSD_DBG("detect_work");
 
-	#if 0
 	local_irq_save(irq_flags);
 	disable_irq(hi->irq_detect);
 	local_irq_restore(irq_flags);
-#endif
 
 	state = gpio_get_value_cansleep(hi->gpio_detect);
 
@@ -348,73 +402,113 @@ static void detect_work(struct work_struct *work)
 		}
 	}
 
-	#if 0
 	local_irq_save(irq_flags);
 	enable_irq(hi->irq_detect);
 	local_irq_restore(irq_flags);
-#endif
+
 }
 
 static irqreturn_t gpio_irq_handler(int irq, void *dev_id)
 {
 	struct hsd_info *hi = (struct hsd_info *) dev_id;
-	
-	#if 0
+
 	int value = gpio_get_value_cansleep(hi->gpio_detect);
-#endif
-	wake_lock_timeout(&ear_hook_wake_lock, 2 * HZ); 
 
 	HSD_DBG("gpio_irq_handler");
 
-	#if 0
 	if ((switch_get_state(&hi->sdev) ^ !value)) { /* the detection status is inverted */
 		schedule_work(&(hi->work));
 	}
-#else
 
-#ifdef CONFIG_FSA8008_USE_LOCAL_WORK_QUEUE
-
-#if 1 //def CONFIG_MACH_LGE_I_BOARD_DCM
-	queue_delayed_work(local_fsa8008_workqueue, &(hi->work), HZ/2 /* 500ms */);
-#else
-	queue_delayed_work(local_fsa8008_workqueue, &(hi->work), 0);
-#endif
-
-#else
-
-#if 1 //def CONFIG_MACH_LGE_I_BOARD_DCM
-	schedule_delayed_work(&(hi->work), HZ/2 /* 500ms */);
-#else
-	schedule_delayed_work(&(hi->work), 0);
-#endif
-
-#endif
-
-#endif
 	return IRQ_HANDLED;
+}
+
+static int my_atoi(const char *name)
+{
+	int val = 0;
+
+	for (;; name++) {
+		switch (*name) {
+		case '0' ... '9':
+			val = 10*val+(*name-'0');
+			break;
+		default:
+			return val;
+		}
+	}
+}
+
+static int read_file(char* filename)
+{
+	int fd = -1;
+	int val = 0;
+	char buf[2];
+	loff_t pos = 0;
+	struct file *file;
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(KERNEL_DS);
+	fd = sys_open((const char __user *)filename, O_RDONLY, 0);
+	//printk("[SMPL_CNT] ===> read() : fd is %d\n", fd);
+	if (fd < 0) {
+		return -1;
+	}
+	else
+	{
+		file = fget(fd);
+		
+		if(file)
+		{
+			vfs_read(file, buf, sizeof(buf),&pos);
+			val = my_atoi(buf);
+		}
+		sys_close(fd);
+	}
+	set_fs(old_fs);
+	return val;
 }
 
 static irqreturn_t button_irq_handler(int irq, void *dev_id)
 {
 	struct hsd_info *hi = (struct hsd_info *) dev_id;
+	int value = 0;
+	int fp = read_file(EARJACK_FILENAME);
+	
+	if(fp < 0)	
+	{
+		
 
-	int value;
+		HSD_DBG("button_irq_handler");
 
-	wake_lock_timeout(&ear_hook_wake_lock, 2 * HZ); 
+		value = gpio_get_value_cansleep(hi->gpio_key);
 
-	HSD_DBG("button_irq_handler");
+		if (value) button_pressed(hi);
+		else button_released(hi);
 
-	value = gpio_get_value_cansleep(hi->gpio_key);
+		return IRQ_HANDLED;
+	}
+	else
+	{
+		if(fp)
+		{
+			
+			HSD_DBG("button_irq_handler");
 
-#ifdef	CONFIG_FSA8008_USE_LOCAL_WORK_QUEUE
-	if (value) queue_delayed_work(local_fsa8008_workqueue, &(hi->work_for_key_pressed), hi->latency_for_key );
-	else queue_delayed_work(local_fsa8008_workqueue, &(hi->work_for_key_released), hi->latency_for_key );
-#else
-	if (value) schedule_delayed_work(&(hi->work_for_key_pressed), hi->latency_for_key );
-	else schedule_delayed_work(&(hi->work_for_key_released), hi->latency_for_key );
-#endif
+			value = gpio_get_value_cansleep(hi->gpio_key);
 
-	return IRQ_HANDLED;
+			if (value) button_pressed(hi);
+			else button_released(hi);
+
+			return IRQ_HANDLED;
+		}
+		else
+		{
+			
+			return IRQ_NONE;		
+		}
+	}
+	
+	return IRQ_NONE;		
 }
 
 static int lge_hsd_probe(struct platform_device *pdev)
@@ -451,12 +545,10 @@ static int lge_hsd_probe(struct platform_device *pdev)
 	hi->set_headset_mic_bias = pdata->set_headset_mic_bias;
 
 	hi->latency_for_detection = pdata->latency_for_detection;
-//	hi->latency_for_key = 0;
-	hi->latency_for_key = 200 /* milli */ * HZ / 1000; /* convert milli to jiffies */
+
 	mutex_init(&hi->mutex_lock);
-	INIT_DELAYED_WORK(&hi->work, detect_work);
-	INIT_DELAYED_WORK(&hi->work_for_key_pressed, button_pressed);
-	INIT_DELAYED_WORK(&hi->work_for_key_released, button_released);
+
+	INIT_WORK(&hi->work, detect_work);
 
 	/* initialize gpio_detect */
 	ret = gpio_request(hi->gpio_detect, "gpio_detect");
@@ -599,11 +691,7 @@ static int lge_hsd_probe(struct platform_device *pdev)
 	}
 
 	if (!gpio_get_value_cansleep(hi->gpio_detect))
-#ifdef CONFIG_FSA8008_USE_LOCAL_WORK_QUEUE
-		queue_delayed_work(local_fsa8008_workqueue, &(hi->work), 0); /* to detect in initialization with eacjack insertion */
-#else
-		schedule_delayed_work(&(hi->work), 0); /* to detect in initialization with eacjack insertion */
-#endif
+		schedule_work(&(hi->work)); /* to detect in initialization with eacjack insertion */
 
 #ifdef AT_TEST_GPKD
 	err = device_create_file(&pdev->dev, &dev_attr_hookkeylog);
@@ -678,35 +766,18 @@ static int __init lge_hsd_init(void)
 	int ret;
 
 	HSD_DBG("lge_hsd_init");
-
-#ifdef CONFIG_FSA8008_USE_LOCAL_WORK_QUEUE
-	local_fsa8008_workqueue = create_workqueue("fsa8008") ;
-	if(!local_fsa8008_workqueue)
-		return -ENOMEM;
-#endif
-
 	ret = platform_driver_register(&lge_hsd_driver);
 	if (ret) {
 		HSD_ERR("Fail to register platform driver\n");
 	}
-
-	wake_lock_init(&ear_hook_wake_lock, WAKE_LOCK_SUSPEND, "ear_hook");
 
 	return ret;
 }
 
 static void __exit lge_hsd_exit(void)
 {
-#ifdef CONFIG_FSA8008_USE_LOCAL_WORK_QUEUE
-	if(local_fsa8008_workqueue)
-		destroy_workqueue(local_fsa8008_workqueue);
-	local_fsa8008_workqueue = NULL;
-#endif
-
 	platform_driver_unregister(&lge_hsd_driver);
 	HSD_DBG("lge_hsd_exit");
-
-	wake_lock_destroy(&ear_hook_wake_lock);
 }
 
 /* to make init after pmic8058-othc module */

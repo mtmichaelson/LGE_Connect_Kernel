@@ -42,13 +42,18 @@
 #include <asm/clkdev.h>
 #include <mach/usbdiag.h>
 #include <mach/usb_gadget_fserial.h>
+#include <mach/msm_serial_hs_lite.h>
 #include <mach/msm_bus.h>
 #include <mach/msm_bus_board.h>
 #include <mach/socinfo.h>
+#include <mach/msm_memtypes.h>
+#include <mach/msm_tsif.h>
+#include <mach/scm-io.h>
 #ifdef CONFIG_MSM_DSPS
 #include <mach/msm_dsps.h>
 #endif
 #include <linux/gpio.h>
+#include <linux/delay.h>
 #include <mach/mdm.h>
 #include <mach/rpm.h>
 #include "rpm_stats.h"
@@ -98,47 +103,79 @@
 
 /* byongdoo.oh@lge.com 2011.2.22 */
 #ifdef CONFIG_LGE_MDM_PMIC_8028
+#include <mach/msm_xo.h>
+static int __first_boot = 1;
+#endif
+
 static void charm_ap2mdm_kpdpwr_on(void)
 {
-	gpio_direction_output(132, 1);
+	gpio_direction_output(AP2MDM_PMIC_RESET_N, 0);
+
+#ifdef CONFIG_LGE_MDM_PMIC_8028
+	if(__first_boot){
+		__first_boot=0;
+		msm_xo_mode_vote(msm_xo_get(MSM_XO_TCXO_A1, "MDM Dloader"),MSM_XO_MODE_PIN_CTRL);
+	}
+#endif
+
+	if (machine_is_msm8x60_charm_surf())
+		gpio_direction_output(AP2MDM_KPDPWR_N, 0);
+	else
+		gpio_direction_output(AP2MDM_KPDPWR_N, 1);
 }
 
 static void charm_ap2mdm_kpdpwr_off(void)
 {
-	gpio_direction_output(132, 0);
+	int i;
 
+	gpio_direction_output(AP2MDM_ERRFATAL, 1);
+
+	for (i = 20; i > 0; i--) {
+		if (gpio_get_value(MDM2AP_STATUS) == 0)
+			break;
+		msleep(100);
+	}
+	gpio_direction_output(AP2MDM_ERRFATAL, 0);
+
+	if (i == 0) {
+		pr_err("%s: MDM2AP_STATUS never went low. Doing a hard reset \
+			of the charm modem.\n", __func__);
+		gpio_direction_output(AP2MDM_PMIC_RESET_N, 1);
+		/*
+		* Currently, there is a debounce timer on the charm PMIC. It is
+		* necessary to hold the AP2MDM_PMIC_RESET low for ~3.5 seconds
+		* for the reset to fully take place. Sleep here to ensure the
+		* reset has occured before the function exits.
+		*/
+		msleep(4000);
+		gpio_direction_output(AP2MDM_PMIC_RESET_N, 0);
+	}
 }
-#else
-static void charm_ap2mdm_kpdpwr_on(void)
-{
-	if (machine_is_msm8x60_charm_surf())
-		gpio_direction_output(132, 0);
-	else
-		gpio_direction_output(132, 1);
-}
 
-static void charm_ap2mdm_kpdpwr_off(void)
+#ifdef CONFIG_LGE_MDM_PMIC_8028
+static void charm_force_reset(void)
 {
-	if (machine_is_msm8x60_charm_surf())
-		gpio_direction_output(132, 1);
-	else
-		gpio_direction_output(132, 0);
-
+	gpio_direction_output(AP2MDM_PMIC_RESET_N, 1);
+	gpio_direction_output(AP2MDM_KPDPWR_N, 0);
+	msm_xo_mode_vote(msm_xo_get(MSM_XO_TCXO_A1, "MDM Dloader"),MSM_XO_MODE_OFF);
+	msleep(4000);
+	msm_xo_mode_vote(msm_xo_get(MSM_XO_TCXO_A1, "MDM Dloader"),MSM_XO_MODE_PIN_CTRL);
+	gpio_direction_output(AP2MDM_KPDPWR_N, 1);
+	gpio_direction_output(AP2MDM_PMIC_RESET_N, 0);
 }
 #endif
-/* end byongdoo.oh@lge.com */
 
 static struct resource charm_resources[] = {
 	/* MDM2AP_ERRFATAL */
 	{
-		.start	= MSM_GPIO_TO_INT(133),
-		.end	= MSM_GPIO_TO_INT(133),
+		.start	= MSM_GPIO_TO_INT(MDM2AP_ERRFATAL),
+		.end	= MSM_GPIO_TO_INT(MDM2AP_ERRFATAL),
 		.flags = IORESOURCE_IRQ,
 	},
 	/* MDM2AP_STATUS */
 	{
-		.start	= MSM_GPIO_TO_INT(134),
-		.end	= MSM_GPIO_TO_INT(134),
+		.start	= MSM_GPIO_TO_INT(MDM2AP_STATUS),
+		.end	= MSM_GPIO_TO_INT(MDM2AP_STATUS),
 		.flags = IORESOURCE_IRQ,
 	}
 };
@@ -146,6 +183,9 @@ static struct resource charm_resources[] = {
 static struct charm_platform_data mdm_platform_data = {
 	.charm_modem_on		= charm_ap2mdm_kpdpwr_on,
 	.charm_modem_off	= charm_ap2mdm_kpdpwr_off,
+#ifdef CONFIG_LGE_MDM_PMIC_8028
+	.charm_force_reset      = charm_force_reset,
+#endif 
 };
 
 struct platform_device msm_charm_modem = {
@@ -294,6 +334,12 @@ struct platform_device msm_device_uart_dm12 = {
 };
 
 #ifdef CONFIG_MSM_GSBI9_UART
+static struct msm_serial_hslite_platform_data uart_gsbi9_pdata = {
+	.config_gpio	= 1,
+	.uart_tx_gpio	= 67,
+	.uart_rx_gpio	= 66,
+};
+
 static struct resource msm_uart_gsbi9_resources[] = {
        {
 		.start	= MSM_UART9DM_PHYS,
@@ -315,12 +361,37 @@ static struct resource msm_uart_gsbi9_resources[] = {
 	},
 };
 
-struct platform_device msm_device_uart_gsbi9 = {
-	.name	= "msm_serial_hsl",
-	.id	= 1,
-	.num_resources	= ARRAY_SIZE(msm_uart_gsbi9_resources),
-	.resource	= msm_uart_gsbi9_resources,
-};
+struct platform_device *msm_device_uart_gsbi9;
+struct platform_device *msm_add_gsbi9_uart(void)
+{
+	int ret = -ENOMEM;
+	struct platform_device *pdev;
+
+	pdev = platform_device_alloc("msm_serial_hsl", 1);
+	if (!pdev)
+		goto fail;
+
+	ret = platform_device_add_resources(pdev,
+				msm_uart_gsbi9_resources,
+				ARRAY_SIZE(msm_uart_gsbi9_resources));
+	if (ret)
+		goto fail;
+
+	ret = platform_device_add_data(pdev, &uart_gsbi9_pdata,
+						sizeof(uart_gsbi9_pdata));
+	if (ret)
+		goto fail;
+
+	ret = platform_device_add(pdev);
+	if (ret)
+		goto fail;
+
+	return pdev;
+fail:
+	pr_err("%s(): Error creating device\n", __func__);
+	platform_device_put(pdev);
+	return ERR_PTR(ret);
+}
 #endif
 
 #ifdef CONFIG_LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C
@@ -517,7 +588,7 @@ static struct resource gsbi5_qup_i2c_resources[] = {
 };
 #endif
 
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 static struct resource gsbi11_qup_i2c_resources[] = {
 	{
 		.name	= "qup_phys_addr",
@@ -540,46 +611,6 @@ static struct resource gsbi11_qup_i2c_resources[] = {
 };
 #endif
 
-static struct resource kgsl_resources[] = {
-	{
-		.name = "kgsl_reg_memory",
-		.start = 0x04300000, /* GFX3D address */
-		.end = 0x0431ffff,
-		.flags = IORESOURCE_MEM,
-	},
-	{
-		.name = "kgsl_yamato_irq",
-		.start = GFX3D_IRQ,
-		.end = GFX3D_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "kgsl_2d0_reg_memory",
-		.start = 0x04100000, /* Z180 base address */
-		.end = 0x04100FFF,
-		.flags = IORESOURCE_MEM,
-	},
-	{
-		.name  = "kgsl_2d0_irq",
-		.start = GFX2D0_IRQ,
-		.end = GFX2D0_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "kgsl_2d1_reg_memory",
-		.start = 0x04200000, /* Z180 device 1 base address */
-		.end =   0x04200FFF,
-		.flags = IORESOURCE_MEM,
-	},
-	{
-		.name  = "kgsl_2d1_irq",
-		.start = GFX2D1_IRQ,
-		.end = GFX2D1_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-
-};
-
 #ifdef CONFIG_MSM_BUS_SCALING
 static struct msm_bus_vectors grp3d_init_vectors[] = {
 	{
@@ -590,12 +621,21 @@ static struct msm_bus_vectors grp3d_init_vectors[] = {
 	},
 };
 
-static struct msm_bus_vectors grp3d_nominal_vectors[] = {
+static struct msm_bus_vectors grp3d_nominal_low_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_GRAPHICS_3D,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 0,
-		.ib = 200800000U,
+		.ib = 1300000000U,
+	},
+};
+
+static struct msm_bus_vectors grp3d_nominal_high_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_GRAPHICS_3D,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 0,
+		.ib = 2008000000U,
 	},
 };
 
@@ -604,7 +644,7 @@ static struct msm_bus_vectors grp3d_max_vectors[] = {
 		.src = MSM_BUS_MASTER_GRAPHICS_3D,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 0,
-		.ib = 2096000000U,
+		.ib = 2484000000U,
 	},
 };
 
@@ -614,8 +654,12 @@ static struct msm_bus_paths grp3d_bus_scale_usecases[] = {
 		grp3d_init_vectors,
 	},
 	{
-		ARRAY_SIZE(grp3d_nominal_vectors),
-		grp3d_nominal_vectors,
+		ARRAY_SIZE(grp3d_nominal_low_vectors),
+		grp3d_nominal_low_vectors,
+	},
+	{
+		ARRAY_SIZE(grp3d_nominal_high_vectors),
+		grp3d_nominal_high_vectors,
 	},
 	{
 		ARRAY_SIZE(grp3d_max_vectors),
@@ -629,6 +673,7 @@ static struct msm_bus_scale_pdata grp3d_bus_scale_pdata = {
 	.name = "grp3d",
 };
 
+#ifdef CONFIG_MSM_KGSL_2D
 static struct msm_bus_vectors grp2d0_init_vectors[] = {
 	{
 		.src = MSM_BUS_MASTER_GRAPHICS_2D_CORE0,
@@ -643,7 +688,7 @@ static struct msm_bus_vectors grp2d0_max_vectors[] = {
 		.src = MSM_BUS_MASTER_GRAPHICS_2D_CORE0,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 0,
-		.ib = 248000000,
+		.ib = 1300000000U,
 	},
 };
 
@@ -658,7 +703,7 @@ static struct msm_bus_paths grp2d0_bus_scale_usecases[] = {
 	},
 };
 
-struct msm_bus_scale_pdata grp2d0_bus_scale_pdata = {
+static struct msm_bus_scale_pdata grp2d0_bus_scale_pdata = {
 	grp2d0_bus_scale_usecases,
 	ARRAY_SIZE(grp2d0_bus_scale_usecases),
 	.name = "grp2d0",
@@ -678,7 +723,7 @@ static struct msm_bus_vectors grp2d1_max_vectors[] = {
 		.src = MSM_BUS_MASTER_GRAPHICS_2D_CORE1,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 0,
-		.ib = 248000000,
+		.ib = 1300000000U,
 	},
 };
 
@@ -693,11 +738,12 @@ static struct msm_bus_paths grp2d1_bus_scale_usecases[] = {
 	},
 };
 
-struct msm_bus_scale_pdata grp2d1_bus_scale_pdata = {
+static struct msm_bus_scale_pdata grp2d1_bus_scale_pdata = {
 	grp2d1_bus_scale_usecases,
 	ARRAY_SIZE(grp2d1_bus_scale_usecases),
 	.name = "grp2d1",
 };
+#endif
 #endif
 
 #ifdef CONFIG_HW_RANDOM_MSM
@@ -715,18 +761,19 @@ struct platform_device msm_device_rng = {
 };
 #endif
 
-static struct kgsl_core_platform_data kgsl_core_pdata = {
-	.pt_va_base = 0x66000000,
-	/* The maximum possible range for any individual pagetable
-	   is 256MB - 64K (0xfff0000) */
-
-#ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
-	.pt_va_size = SZ_128M,
-#else
-	/* Set the GPU pagetable size to the maximum practical
-	 * limit */
-	.pt_va_size = SZ_256M - SZ_64K,
-#endif
+static struct resource kgsl_3d0_resources[] = {
+	{
+		.name = KGSL_3D0_REG_MEMORY,
+		.start = 0x04300000, /* GFX3D address */
+		.end = 0x0431ffff,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name = KGSL_3D0_IRQ,
+		.start = GFX3D_IRQ,
+		.end = GFX3D_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
 };
 
 static struct kgsl_device_platform_data kgsl_3d0_pdata = {
@@ -734,24 +781,30 @@ static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 		.pwrlevel = {
 			{
 				.gpu_freq = 266667000,
-				.bus_freq = 2,
+				.bus_freq = 3,
 			},
 			{
 				.gpu_freq = 228571000,
+				.bus_freq = 2,
+			},
+			{
+				.gpu_freq = 200000000,
 				.bus_freq = 1,
 			},
 			{
-				.gpu_freq = 266667000,
+				.gpu_freq = 27000000,
 				.bus_freq = 0,
 			},
 		},
 		.init_level = 0,
-		.num_levels = 3,
+		.num_levels = 4,
 		.set_grp_async = NULL,
 		.idle_timeout = HZ/5,
 #ifdef CONFIG_MSM_BUS_SCALING
 		.nap_allowed = true,
+		.idle_pass = true,
 #endif
+		.pwrrail_first = true,
 	},
 	.clk = {
 		.name = {
@@ -760,8 +813,6 @@ static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 		},
 #ifdef CONFIG_MSM_BUS_SCALING
 		.bus_scale_table = &grp3d_bus_scale_pdata,
-#else
-		.bus_scale_table = NULL,
 #endif
 	},
 	.imem_clk_name = {
@@ -770,15 +821,41 @@ static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 	},
 };
 
+struct platform_device msm_kgsl_3d0 = {
+	.name = "kgsl-3d0",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(kgsl_3d0_resources),
+	.resource = kgsl_3d0_resources,
+	.dev = {
+		.platform_data = &kgsl_3d0_pdata,
+	},
+};
+
+#ifdef CONFIG_MSM_KGSL_2D
+static struct resource kgsl_2d0_resources[] = {
+	{
+		.name = KGSL_2D0_REG_MEMORY,
+		.start = 0x04100000, /* Z180 base address */
+		.end = 0x04100FFF,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name  = KGSL_2D0_IRQ,
+		.start = GFX2D0_IRQ,
+		.end = GFX2D0_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
 static struct kgsl_device_platform_data kgsl_2d0_pdata = {
 	.pwr_data = {
 		.pwrlevel = {
 			{
-				.gpu_freq = 228571000,
+				.gpu_freq = 200000000,
 				.bus_freq = 1,
 			},
 			{
-				.gpu_freq = 228571000,
+				.gpu_freq = 200000000,
 				.bus_freq = 0,
 			},
 		},
@@ -789,22 +866,42 @@ static struct kgsl_device_platform_data kgsl_2d0_pdata = {
 #ifdef CONFIG_MSM_BUS_SCALING
 		.nap_allowed = true,
 #endif
+		.pwrrail_first = true,
 	},
 	.clk = {
 		.name = {
-#ifdef CONFIG_MSM_KGSL_2D
 			/* note: 2d clocks disabled on v1 */
 			.clk = "gfx2d0_clk",
 			.pclk = "gfx2d0_pclk",
-#else
-			.clk = NULL,
-#endif
 		},
 #ifdef CONFIG_MSM_BUS_SCALING
 		.bus_scale_table = &grp2d0_bus_scale_pdata,
-#else
-		.bus_scale_table = NULL,
 #endif
+	},
+};
+
+struct platform_device msm_kgsl_2d0 = {
+	.name = "kgsl-2d0",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(kgsl_2d0_resources),
+	.resource = kgsl_2d0_resources,
+	.dev = {
+		.platform_data = &kgsl_2d0_pdata,
+	},
+};
+
+static struct resource kgsl_2d1_resources[] = {
+	{
+		.name = KGSL_2D1_REG_MEMORY,
+		.start = 0x04200000, /* Z180 device 1 base address */
+		.end =   0x04200FFF,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name  = KGSL_2D1_IRQ,
+		.start = GFX2D1_IRQ,
+		.end = GFX2D1_IRQ,
+		.flags = IORESOURCE_IRQ,
 	},
 };
 
@@ -812,11 +909,11 @@ static struct kgsl_device_platform_data kgsl_2d1_pdata = {
 	.pwr_data = {
 		.pwrlevel = {
 			{
-				.gpu_freq = 228571000,
+				.gpu_freq = 200000000,
 				.bus_freq = 1,
 			},
 			{
-				.gpu_freq = 228571000,
+				.gpu_freq = 200000000,
 				.bus_freq = 0,
 			},
 		},
@@ -827,29 +924,27 @@ static struct kgsl_device_platform_data kgsl_2d1_pdata = {
 #ifdef CONFIG_MSM_BUS_SCALING
 		.nap_allowed = true,
 #endif
+		.pwrrail_first = true,
 	},
 	.clk = {
 		.name = {
-#ifdef CONFIG_MSM_KGSL_2D
 			.clk = "gfx2d1_clk",
 			.pclk = "gfx2d1_pclk",
-#else
-			.clk = NULL,
-#endif
 		},
 #ifdef CONFIG_MSM_BUS_SCALING
 		.bus_scale_table = &grp2d1_bus_scale_pdata,
-#else
-		.bus_scale_table = NULL,
 #endif
 	},
 };
 
-static struct kgsl_platform_data kgsl_pdata = {
-	.core = &kgsl_core_pdata,
-	.dev_3d0 = &kgsl_3d0_pdata,
-	.dev_2d0 = &kgsl_2d0_pdata,
-	.dev_2d1 = &kgsl_2d1_pdata,
+struct platform_device msm_kgsl_2d1 = {
+	.name = "kgsl-2d1",
+	.id = 1,
+	.num_resources = ARRAY_SIZE(kgsl_2d1_resources),
+	.resource = kgsl_2d1_resources,
+	.dev = {
+		.platform_data = &kgsl_2d1_pdata,
+	},
 };
 
 /*
@@ -867,16 +962,7 @@ void __init msm8x60_check_2d_hardware(void)
 		kgsl_2d1_pdata.clk.name.clk = NULL;
 	}
 }
-
-struct platform_device msm_device_kgsl = {
-	.name = "kgsl",
-	.id = -1,
-	.num_resources = ARRAY_SIZE(kgsl_resources),
-	.resource = kgsl_resources,
-	.dev = {
-		.platform_data = &kgsl_pdata,
-	},
-};
+#endif
 
 #ifdef CONFIG_LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C
 /* Use GSBI1 QUP for /dev/i2c-10 */
@@ -957,7 +1043,7 @@ struct platform_device msm_gsbi5_qup_i2c_device = {
 };
 #endif
 
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 /* Use GSBI5 QUP for /dev/i2c-9 (wireless charger) */
 struct platform_device msm_gsbi11_qup_i2c_device = {
 	.name		= "qup_i2c",
@@ -1111,10 +1197,17 @@ static struct resource resources_sdc1[] = {
 		.flags	= IORESOURCE_IRQ,
 	},
 	{
+		.name	= "sdcc_dma_chnl",
 		.start	= DMOV_SDC1_CHAN,
 		.end	= DMOV_SDC1_CHAN,
 		.flags	= IORESOURCE_DMA,
 	},
+	{
+		.name	= "sdcc_dma_crci",
+		.start	= DMOV_SDC1_CRCI,
+		.end	= DMOV_SDC1_CRCI,
+		.flags	= IORESOURCE_DMA,
+	}
 };
 
 static struct resource resources_sdc2[] = {
@@ -1129,10 +1222,17 @@ static struct resource resources_sdc2[] = {
 		.flags	= IORESOURCE_IRQ,
 	},
 	{
+		.name	= "sdcc_dma_chnl",
 		.start	= DMOV_SDC2_CHAN,
 		.end	= DMOV_SDC2_CHAN,
 		.flags	= IORESOURCE_DMA,
 	},
+	{
+		.name	= "sdcc_dma_crci",
+		.start	= DMOV_SDC2_CRCI,
+		.end	= DMOV_SDC2_CRCI,
+		.flags	= IORESOURCE_DMA,
+	}
 };
 
 static struct resource resources_sdc3[] = {
@@ -1147,8 +1247,15 @@ static struct resource resources_sdc3[] = {
 		.flags	= IORESOURCE_IRQ,
 	},
 	{
+		.name	= "sdcc_dma_chnl",
 		.start	= DMOV_SDC3_CHAN,
 		.end	= DMOV_SDC3_CHAN,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "sdcc_dma_crci",
+		.start	= DMOV_SDC3_CRCI,
+		.end	= DMOV_SDC3_CRCI,
 		.flags	= IORESOURCE_DMA,
 	},
 };
@@ -1165,8 +1272,15 @@ static struct resource resources_sdc4[] = {
 		.flags	= IORESOURCE_IRQ,
 	},
 	{
+		.name	= "sdcc_dma_chnl",
 		.start	= DMOV_SDC4_CHAN,
 		.end	= DMOV_SDC4_CHAN,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "sdcc_dma_crci",
+		.start	= DMOV_SDC4_CRCI,
+		.end	= DMOV_SDC4_CRCI,
 		.flags	= IORESOURCE_DMA,
 	},
 };
@@ -1183,8 +1297,15 @@ static struct resource resources_sdc5[] = {
 		.flags	= IORESOURCE_IRQ,
 	},
 	{
+		.name	= "sdcc_dma_chnl",
 		.start	= DMOV_SDC5_CHAN,
 		.end	= DMOV_SDC5_CHAN,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "sdcc_dma_crci",
+		.start	= DMOV_SDC5_CRCI,
+		.end	= DMOV_SDC5_CRCI,
 		.flags	= IORESOURCE_DMA,
 	},
 };
@@ -1523,7 +1644,7 @@ struct platform_device msm_device_gadget_peripheral = {
 		.coherent_dma_mask	= 0xffffffffULL,
 	},
 };
-#ifdef CONFIG_USB_EHCI_MSM
+#ifdef CONFIG_USB_EHCI_MSM_72K
 static struct resource resources_hsusb_host[] = {
 	{
 		.start	= 0x12500000,
@@ -1644,6 +1765,140 @@ struct platform_device usb_diag_mdm_device = {
 };
 #endif
 
+#define MSM_TSIF0_PHYS       (0x18200000)
+#define MSM_TSIF1_PHYS       (0x18201000)
+#define MSM_TSIF_SIZE        (0x200)
+#define TCSR_ADM_0_A_CRCI_MUX_SEL 0x0070
+
+#define TSIF_0_CLK       GPIO_CFG(93, 1, GPIO_CFG_INPUT, \
+	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+#define TSIF_0_EN        GPIO_CFG(94, 1, GPIO_CFG_INPUT, \
+	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+#define TSIF_0_DATA      GPIO_CFG(95, 1, GPIO_CFG_INPUT, \
+	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+#define TSIF_0_SYNC      GPIO_CFG(96, 1, GPIO_CFG_INPUT, \
+	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+#define TSIF_1_CLK       GPIO_CFG(97, 1, GPIO_CFG_INPUT, \
+	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+#define TSIF_1_EN        GPIO_CFG(98, 1, GPIO_CFG_INPUT, \
+	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+#define TSIF_1_DATA      GPIO_CFG(99, 1, GPIO_CFG_INPUT, \
+	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+#define TSIF_1_SYNC      GPIO_CFG(100, 1, GPIO_CFG_INPUT, \
+	GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
+
+static const struct msm_gpio tsif0_gpios[] = {
+	{ .gpio_cfg = TSIF_0_CLK,  .label =  "tsif_clk", },
+	{ .gpio_cfg = TSIF_0_EN,   .label =  "tsif_en", },
+	{ .gpio_cfg = TSIF_0_DATA, .label =  "tsif_data", },
+	{ .gpio_cfg = TSIF_0_SYNC, .label =  "tsif_sync", },
+};
+
+static const struct msm_gpio tsif1_gpios[] = {
+	{ .gpio_cfg = TSIF_1_CLK,  .label =  "tsif_clk", },
+	{ .gpio_cfg = TSIF_1_EN,   .label =  "tsif_en", },
+	{ .gpio_cfg = TSIF_1_DATA, .label =  "tsif_data", },
+	{ .gpio_cfg = TSIF_1_SYNC, .label =  "tsif_sync", },
+};
+
+static void tsif_release(struct device *dev)
+{
+}
+
+static void tsif_init1(struct msm_tsif_platform_data *data)
+{
+	int val;
+
+	/* configure mux to use correct tsif instance */
+	val = secure_readl(MSM_TCSR_BASE + TCSR_ADM_0_A_CRCI_MUX_SEL);
+	val |= 0x80000000;
+	secure_writel(val, MSM_TCSR_BASE + TCSR_ADM_0_A_CRCI_MUX_SEL);
+}
+
+struct msm_tsif_platform_data tsif1_platform_data = {
+	.num_gpios = ARRAY_SIZE(tsif1_gpios),
+	.gpios = tsif1_gpios,
+	.tsif_pclk = "tsif_pclk",
+	.tsif_ref_clk = "tsif_ref_clk",
+	.init = tsif_init1
+};
+
+struct resource tsif1_resources[] = {
+	[0] = {
+		.flags = IORESOURCE_IRQ,
+		.start = TSIF2_IRQ,
+		.end   = TSIF2_IRQ,
+	},
+	[1] = {
+		.flags = IORESOURCE_MEM,
+		.start = MSM_TSIF1_PHYS,
+		.end   = MSM_TSIF1_PHYS + MSM_TSIF_SIZE - 1,
+	},
+	[2] = {
+		.flags = IORESOURCE_DMA,
+		.start = DMOV_TSIF_CHAN,
+		.end   = DMOV_TSIF_CRCI,
+	},
+};
+
+static void tsif_init0(struct msm_tsif_platform_data *data)
+{
+	int val;
+
+	/* configure mux to use correct tsif instance */
+	val = secure_readl(MSM_TCSR_BASE + TCSR_ADM_0_A_CRCI_MUX_SEL);
+	val &= 0x7FFFFFFF;
+	secure_writel(val, MSM_TCSR_BASE + TCSR_ADM_0_A_CRCI_MUX_SEL);
+}
+
+struct msm_tsif_platform_data tsif0_platform_data = {
+	.num_gpios = ARRAY_SIZE(tsif0_gpios),
+	.gpios = tsif0_gpios,
+	.tsif_pclk = "tsif_pclk",
+	.tsif_ref_clk = "tsif_ref_clk",
+	.init = tsif_init0
+};
+struct resource tsif0_resources[] = {
+	[0] = {
+		.flags = IORESOURCE_IRQ,
+		.start = TSIF1_IRQ,
+		.end   = TSIF1_IRQ,
+	},
+	[1] = {
+		.flags = IORESOURCE_MEM,
+		.start = MSM_TSIF0_PHYS,
+		.end   = MSM_TSIF0_PHYS + MSM_TSIF_SIZE - 1,
+	},
+	[2] = {
+		.flags = IORESOURCE_DMA,
+		.start = DMOV_TSIF_CHAN,
+		.end   = DMOV_TSIF_CRCI,
+	},
+};
+
+struct platform_device msm_device_tsif[2] = {
+	{
+		.name          = "msm_tsif",
+		.id            = 0,
+		.num_resources = ARRAY_SIZE(tsif0_resources),
+		.resource      = tsif0_resources,
+		.dev = {
+			.release       = tsif_release,
+			.platform_data = &tsif0_platform_data
+		},
+	},
+	{
+		.name          = "msm_tsif",
+		.id            = 1,
+		.num_resources = ARRAY_SIZE(tsif1_resources),
+		.resource      = tsif1_resources,
+		.dev = {
+			.release       = tsif_release,
+			.platform_data = &tsif1_platform_data
+		},
+	}
+};
+
 #ifdef CONFIG_USB_F_SERIAL
 static struct usb_gadget_fserial_platform_data fserial_pdata = {
 	.no_ports	= 2,
@@ -1654,6 +1909,20 @@ struct platform_device usb_gadget_fserial_device = {
 	.id	= -1,
 	.dev	= {
 		.platform_data = &fserial_pdata,
+	},
+};
+#endif
+
+#ifdef CONFIG_USB_ANDROID_ACM
+static struct usb_gadget_facm_pdata facm_pdata = {
+	.no_ports	= 2,
+};
+
+struct platform_device usb_gadget_facm_device = {
+	.name	= "usb_facm",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &facm_pdata,
 	},
 };
 #endif
@@ -1790,7 +2059,7 @@ static uint16_t msm_mpm_irqs_m2a[MSM_MPM_NR_MPM_IRQS] = {
 };
 
 static uint16_t msm_mpm_bypassed_apps_irqs[] = {
-	TLMM_SCSS_SUMMARY_IRQ,
+	TLMM_MSM_SUMMARY_IRQ,
 	RPM_SCSS_CPU0_GP_HIGH_IRQ,
 	RPM_SCSS_CPU0_GP_MEDIUM_IRQ,
 	RPM_SCSS_CPU0_GP_LOW_IRQ,
@@ -1812,6 +2081,7 @@ static uint16_t msm_mpm_bypassed_apps_irqs[] = {
 	LPASS_SCSS_GP_LOW_IRQ,
 	LPASS_SCSS_GP_MEDIUM_IRQ,
 	LPASS_SCSS_GP_HIGH_IRQ,
+	SDC4_IRQ_0,
 	SPS_MTI_31,
 };
 
@@ -1921,7 +2191,7 @@ struct clk_lookup msm_clocks_8x60[] = {
 #ifdef CONFIG_LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C
 	CLK_8X60("gsbi_qup_clk",   GSBI1_QUP_CLK, "qup_i2c.10",OFF),
 #else
-	CLK_8X60("gsbi_qup_clk",	GSBI1_QUP_CLK, "spi_qsd.0", OFF),
+	CLK_8X60("spi_clk",		GSBI1_QUP_CLK, "spi_qsd.0", OFF),
 #endif
 	CLK_8X60("gsbi_qup_clk",	GSBI2_QUP_CLK,		NULL, OFF),
 	CLK_8X60("gsbi_qup_clk",	GSBI3_QUP_CLK, "qup_i2c.0", OFF),
@@ -1941,7 +2211,7 @@ struct clk_lookup msm_clocks_8x60[] = {
 #if defined (CONFIG_LGE_SENSOR)
 	CLK_8X60("gsbi_qup_clk",	GSBI10_QUP_CLK,"qup_i2c.11", OFF),
 #endif
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 	CLK_8X60("gsbi_qup_clk",	GSBI11_QUP_CLK,"qup_i2c.12",OFF),
 #else
 	CLK_8X60("gsbi_qup_clk",	GSBI11_QUP_CLK,		NULL, OFF),
@@ -1970,7 +2240,7 @@ struct clk_lookup msm_clocks_8x60[] = {
 #ifdef CONFIG_LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C
     CLK_8X60("gsbi_pclk",       GSBI1_P_CLK,"qup_i2c.10",OFF),
 #else
-	CLK_8X60("gsbi_pclk",		GSBI1_P_CLK, "spi_qsd.0", OFF),
+	CLK_8X60("spi_pclk",		GSBI1_P_CLK, "spi_qsd.0", OFF),
 #endif
 	CLK_8X60("gsbi_pclk",		GSBI2_P_CLK,		NULL, OFF),
 	CLK_8X60("gsbi_pclk",		GSBI3_P_CLK, "msm_serial_hsl.2", 0),
@@ -1992,7 +2262,7 @@ struct clk_lookup msm_clocks_8x60[] = {
 #if defined (CONFIG_LGE_SENSOR)
 	CLK_8X60("gsbi_pclk",		GSBI10_P_CLK,"qup_i2c.11", OFF),
 #endif
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 	CLK_8X60("gsbi_pclk",		GSBI11_P_CLK,"qup_i2c.12",OFF),
 #else
 	CLK_8X60("gsbi_pclk",		GSBI11_P_CLK,		NULL, OFF),
@@ -2025,6 +2295,10 @@ struct clk_lookup msm_clocks_8x60[] = {
 	CLK_8X60("csi_clk",		CSI0_CLK,		NULL, OFF),
 	CLK_8X60("csi_clk",		CSI1_CLK,	  "msm_camera_mt9m114.0",
 			OFF),
+	#ifdef CONFIG_LGE_SENSOR_MT9V113
+	CLK_8X60("csi_clk",		CSI1_CLK,	  "msm_camera_mt9v113.0",
+			OFF),
+	#endif
 	CLK_8X60("csi_clk",		CSI1_CLK,	  "msm_camera_ov9726.0",
 			OFF),
 	CLK_8X60("csi_src_clk",		CSI_SRC_CLK,		NULL, OFF),
@@ -2051,6 +2325,10 @@ struct clk_lookup msm_clocks_8x60[] = {
 	CLK_8X60("csi_vfe_clk",		CSI0_VFE_CLK,		NULL, OFF),
 	CLK_8X60("csi_vfe_clk",		CSI1_VFE_CLK,	  "msm_camera_mt9m114.0",
 			OFF),
+	#ifdef CONFIG_LGE_SENSOR_MT9V113
+	CLK_8X60("csi_vfe_clk",		CSI1_VFE_CLK,	  "msm_camera_mt9v113.0",
+			OFF),
+	#endif
 	CLK_8X60("csi_vfe_clk",		CSI1_VFE_CLK,	  "msm_camera_ov9726.0",
 			OFF),
 	CLK_8X60("vfe_clk",		VFE_CLK,		NULL, OFF),
@@ -2067,6 +2345,10 @@ struct clk_lookup msm_clocks_8x60[] = {
 	CLK_8X60("csi_pclk",		CSI0_P_CLK,		NULL, OFF),
 	CLK_8X60("csi_pclk",		CSI1_P_CLK,	  "msm_camera_mt9m114.0",
 			OFF),
+	#ifdef CONFIG_LGE_SENSOR_MT9V113
+	CLK_8X60("csi_pclk",		CSI1_P_CLK,	  "msm_camera_mt9v113.0",
+			OFF),
+	#endif
 	CLK_8X60("csi_pclk",		CSI1_P_CLK,	  "msm_camera_ov9726.0",
 			OFF),
 	CLK_8X60("dsi_m_pclk",		DSI_M_P_CLK,		NULL, OFF),
@@ -2120,6 +2402,27 @@ struct clk_lookup msm_clocks_8x60[] = {
 					"dfab_clk",    "msm_sdcc.4", 0),
 	CLK_VOTER("dfab_sdc_clk",      DFAB_SDC5_CLK,
 					"dfab_clk",    "msm_sdcc.5", 0),
+	CLK_VOTER("ebi1_msmbus_clk",   EBI_MSMBUS_CLK,
+					"ebi1_clk",    NULL, 0),
+	CLK_VOTER("ebi1_adm_clk",     EBI_ADM0_CLK,
+					"ebi1_clk",    "msm_dmov.0", 0),
+	CLK_VOTER("ebi1_adm_clk",     EBI_ADM1_CLK,
+					"ebi1_clk",    "msm_dmov.1", 0),
+
+	CLK_8X60("sc0_div2_mclk",  SC0_DIV2_M_CLK,  NULL, 0),
+	CLK_8X60("sc1_div2_mclk",  SC1_DIV2_M_CLK,  NULL, 0),
+	CLK_8X60("l2_div2_mclk",   L2_DIV2_M_CLK,   NULL, 0),
+	CLK_8X60("afab_mclk",      AFAB_M_CLK,      NULL, 0),
+	CLK_8X60("sfab_mclk",      SFAB_M_CLK,      NULL, 0),
+	CLK_8X60("ebi1_2x_mclk",   EBI1_2X_M_CLK,   NULL, 0),
+	CLK_8X60("cfpb0_mclk",     CFPB0_M_CLK,     NULL, 0),
+	CLK_8X60("cfpb1_mclk",     CFPB1_M_CLK,     NULL, 0),
+	CLK_8X60("cfpb2_mclk",     CFPB2_M_CLK,     NULL, 0),
+	CLK_8X60("dfab_mclk",      DFAB_M_CLK,      NULL, 0),
+	CLK_8X60("sfpb_mclk",      SFPB_M_CLK,      NULL, 0),
+	CLK_8X60("mmfab_mclk",     MMFAB_M_CLK,     NULL, 0),
+	CLK_8X60("smi_ddr2x_mclk", SMI_DDR2X_M_CLK, NULL, 0),
+	CLK_8X60("mmfpb_mclk",     MMFPB_M_CLK,     NULL, 0),
 };
 
 unsigned msm_num_clocks_8x60 = ARRAY_SIZE(msm_clocks_8x60);

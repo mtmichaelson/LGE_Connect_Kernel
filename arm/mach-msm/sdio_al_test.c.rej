@@ -1,0 +1,12 @@
+--- arm/mach-msm/sdio_al_test.c
++++ arm/mach-msm/sdio_al_test.c
+@@ -35,7 +35,8 @@
+ #include <linux/wakelock.h>
+ #include <linux/uaccess.h>
+ 
+-#include <sdio_al_private.h>
++//#include <sdio_al_private.h>
++#include "sdio_al_private.h"
+ #include <linux/debugfs.h>
+ 
+ #include <linux/kthread.h>

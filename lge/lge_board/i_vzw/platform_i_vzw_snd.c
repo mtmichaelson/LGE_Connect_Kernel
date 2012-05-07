@@ -249,23 +249,6 @@ wmCodecCmd seq_lin_to_spkout_playback[] =
     {0x01, 0x100B}
 };
 
-wmCodecCmd seq_lin_to_spkout_vzwnavi[] = 
-{
-    {0x39, 0x000D},
-    {0x01, 0x000B},
-    {0x02, 0x6030},
-    {0x17, 0x0001}, // IN2_CLAMP 0bit 0 : clamp de-activate 1: clamp activated  
-    {0x1A, 0x0102}, // IN2A -6dB(00}, -3.5dB(01}, 0dB(02}, 3.5dB(03}, 6dB(04}, 12dB(05}, 18dB(06}, 18dB(07)  
-    {0x1B, 0x0102}, // IN2B -6dB(00}, -3.5dB(01}, 0dB(02}, 3.5dB(03}, 6dB(04}, 12dB(05}, 18dB(06}, 18dB(07)
-    {0x36, 0x0005},
-    {0x03, 0x0008},
-    {0x22, 0x0000}, // 0dB
-    {0x03, 0x0108},  
-    {0x25, 0x0170}, // 12dB(178}, 9dB(170}, 7.5dB(168}, 6dB(160}, 4.5dB(158}, 3dB(150}, 1.5dB(148}, 0dB(140)
-    {0x26, 0x013F}, // refer page 26  
-    {0x17, 0x0000},  
-    {0x01, 0x100B}
-};
 
 /* QTR HPH ==> WM9093 IN1 ==> EAR */
 wmCodecCmd seq_lin_to_headset[] = 
@@ -302,8 +285,8 @@ wmCodecCmd seq_lin_to_headset_playback[] =
     {0x03, 0x0030},
     {0x2F, 0x0000},
     {0x30, 0x0000},
-    {0x1C, 0x0131},//{0x1C, 0x0137}, //refer to page 26 2011.7.7 dolby tuning
-    {0x1D, 0x0131},//{0x1D, 0x0137}, //refer to page 26 2011.7.7 dolby tuning 
+    {0x1C, 0x0137}, //refer to page 26
+    {0x1D, 0x0137}, //refer to page 26  
     {0x16, 0x0000},
     {0x46, 0x0100},
     {0x49, 0x0100}
@@ -322,14 +305,14 @@ wmCodecCmd seq_lin_to_headset_spkout[] =
     {0x36, 0x0050},
     {0x22, 0x0000}, // 0dB
     {0x25, 0x0170}, // 12dB(178}, 9dB(170}, 7.5dB(168}, 6dB(160}, 4.5dB(158}, 3dB(150}, 1.5dB(148}, 0dB(140)
-	{0x26, 0x0139}, //{0x26, 0x0137},//	 {0x26, 0x013F}, // refer to page 26
+    {0x26, 0x013F}, // refer to page 26  
     {0x2D, 0x0040},
     {0x2E, 0x0010},	
     {0x03, 0x0138},
     {0x2F, 0x0000},	
     {0x30, 0x0000},	
-    {0x1C, 0x011D}, //{0x1C, 0x0117}, //refer to page 26
-    {0x1D, 0x011D}, //{0x1D, 0x0117}, //refer to page 26    
+    {0x1C, 0x0137}, //refer to page 26
+    {0x1D, 0x0137}, //refer to page 26    
     {0x16, 0x0000},	
     {0x46, 0x0100},	
     {0x49, 0x0100}
@@ -442,8 +425,8 @@ wmCodecCmd seq_tuning_lin_to_headset_playback[] =
     {0x03, 0x0030},
     {0x2F, 0x0000},
     {0x30, 0x0000},
-    {0x1C, 0x0131},//{0x1C, 0x0137}, //refer to page 26 2011.7.7 dolby tuning
-    {0x1D, 0x0131},//{0x1D, 0x0137}, //refer to page 26 2011.7.7 dolby tuning 
+    {0x1C, 0x0137}, //refer to page 26
+    {0x1D, 0x0137}, //refer to page 26  
     {0x16, 0x0000},
     {0x46, 0x0100},
     {0x49, 0x0100}
@@ -462,14 +445,14 @@ wmCodecCmd seq_tuning_lin_to_headset_spkout[] =
     {0x36, 0x0050},
     {0x22, 0x0000}, // 0dB
     {0x25, 0x0140}, // 12dB(178}, 9dB(170}, 7.5dB(168}, 6dB(160}, 4.5dB(158}, 3dB(150}, 1.5dB(148}, 0dB(140)
-	{0x26, 0x0139}, //{0x26, 0x0137},//	 {0x26, 0x013F}, // refer to page 26
+    {0x26, 0x013F}, // refer to page 26  
     {0x2D, 0x0040},
     {0x2E, 0x0010},	
     {0x03, 0x0138},
     {0x2F, 0x0000},	
     {0x30, 0x0000},	
-    {0x1C, 0x011D}, //{0x1C, 0x0117}, //refer to page 26
-    {0x1D, 0x011D}, //{0x1D, 0x0117}, //refer to page 26    
+    {0x1C, 0x0125}, //refer to page 26
+    {0x1D, 0x0125}, //refer to page 26    
     {0x16, 0x0000},	
     {0x46, 0x0100},	
     {0x49, 0x0100}
@@ -536,13 +519,6 @@ struct wm9093_platform_data lge_audio_wm9093_platform = {
         .amp_function_size = ARRAY_SIZE(seq_lin_to_headset_playback),
     },
 //LGE_UPDATE_E, jeremy.pi@lge.com, 2011-04-09, at&t
-
-	.speaker_vzwnavi_on = { // playback
-		.amp_function = seq_lin_to_spkout_vzwnavi,
-		.amp_tuning_function = seq_tuning_lin_to_spkout_playback,			
-		.amp_function_size = ARRAY_SIZE(seq_lin_to_spkout_vzwnavi),
-	},
-
 	.power_down = {
 		.amp_function = seq_power_down,
 		.amp_tuning_function = seq_power_down,	
@@ -812,18 +788,6 @@ static int msm_snddev_poweramp_on_spk_playback(void)
 #ifdef CONFIG_LGE_AUDIO_AMP_WM9093
 	if (lge_audio_wm9093_platform.set_amp_path)
 		lge_audio_wm9093_platform.set_amp_path(ICODEC_SPEAKER_PLAYBACK_RX);
-#endif
-
-	return 0;
-}
-
-static int msm_snddev_poweramp_on_spk_vzwnavi(void)
-{
-	pr_debug("%s\n", __func__);
-
-#ifdef CONFIG_LGE_AUDIO_AMP_WM9093
-	if (lge_audio_wm9093_platform.set_amp_path)
-		lge_audio_wm9093_platform.set_amp_path(ICODEC_SPEAKER_PLAYBACK_VZWNAVI);
 #endif
 
 	return 0;
@@ -1226,49 +1190,6 @@ static struct platform_device msm_headset_stereo_device = {
 	.dev = { .platform_data = &snddev_ihs_stereo_rx_data },
 };
 
-
-/* define the value for Earjack Loopback, RX */
-static struct adie_codec_action_unit ihs_stereo_acs_48KHz_osr256_actions[] =
-#ifdef CONFIG_LGE_AUDIO_NO_NCP_MODE
-	HEADSET_RX_STEREO_AB_LEG;
-#else
-	HEADSET_AB_CPLS_48000_OSR_256;
-#endif
-static struct adie_codec_hwsetting_entry ihs_stereo_acs_rx_settings[] = {
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions = ihs_stereo_acs_48KHz_osr256_actions,
-		.action_sz = ARRAY_SIZE(ihs_stereo_acs_48KHz_osr256_actions),
-	}
-};
-static struct adie_codec_dev_profile ihs_stereo_acs_rx_profile = {
-	.path_type = ADIE_CODEC_RX,
-	.settings = ihs_stereo_acs_rx_settings,
-	.setting_sz = ARRAY_SIZE(ihs_stereo_acs_rx_settings),
-};
-static struct snddev_icodec_data snddev_ihs_stereo_acs_rx_data = {
-	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
-	.name = "headset_acs_rx",
-	.copp_id = 0,
-	.profile = &ihs_stereo_acs_rx_profile,
-	.channel_mode = 2,
-	.default_sample_rate = 48000,
-/* LGE_CHANGE 2011. 01. 20 sungwoo.cho, dongsung.shin start */
-#ifdef CONFIG_LGE_AUDIO_AMP_WM9093
-	.pamp_on = msm_snddev_poweramp_on_hph,
-	.pamp_off = msm_snddev_poweramp_off_hph,
-#endif	
-/* LGE_CHANGE 2011. 01. 20 sungwoo.cho, dongsung.shin end */
-	.voltage_on = msm_snddev_voltage_on,
-	.voltage_off = msm_snddev_voltage_off,
-};
-static struct platform_device msm_headset_stereo_acs_device = {
-	.name = "snddev_icodec",
-	.dev = { .platform_data = &snddev_ihs_stereo_acs_rx_data },
-};
-
-
 static struct adie_codec_action_unit ihs_stereo_playback_48KHz_osr256_actions[] =
 #ifdef CONFIG_LGE_AUDIO_NO_NCP_MODE
 	HEADSET_RX_STEREO_PLAYBACK_AB_LEG;
@@ -1422,26 +1343,6 @@ static struct platform_device msm_ispkr_stereo_playback_device = {
 	.name = "snddev_icodec",
 	.dev = { .platform_data = &snddev_ispkr_stereo_playback_data },
 };
-/* start - add VZW navi Device*/
-static struct snddev_icodec_data snddev_ispkr_stereo_vzwnavi_data = {
-	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
-	.name = "speaker_stereo_rx_vzwnavi",
-	.copp_id = 0,
-	.profile = &ispkr_stereo_playback_profile,
-	.channel_mode = 2,
-	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_poweramp_on_spk_vzwnavi,
-	.pamp_off = msm_snddev_poweramp_off_spk,
-	.voltage_on = msm_snddev_voltage_on,
-	.voltage_off = msm_snddev_voltage_off,
-};
-
-static struct platform_device msm_ispkr_stereo_vzwnavi_device = {
-	.name = "snddev_icodec",
-	.dev = { .platform_data = &snddev_ispkr_stereo_vzwnavi_data },
-};
-/* end - add VZW navi Device*/
-
 #ifdef CONFIG_LGE_AUDIO
 
 static int msm_snddev_enable_dualmic_power(void)
@@ -1826,37 +1727,6 @@ static struct platform_device msm_headset_mic_device = {
 	.dev = { .platform_data = &snddev_headset_mic_data },
 };
 
-/* define the value for Earjack Loopback, TX */
-static struct adie_codec_action_unit iheadset_mic_acs_tx_osr256_actions[] =
-	HEADSET_TX_MONO_PRI_OSR_256;
-static struct adie_codec_hwsetting_entry iheadset_mic_acs_tx_settings[] = {
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions = iheadset_mic_acs_tx_osr256_actions,
-		.action_sz = ARRAY_SIZE(iheadset_mic_acs_tx_osr256_actions),
-	}
-};
-static struct adie_codec_dev_profile iheadset_mic_acs_profile = {
-	.path_type = ADIE_CODEC_TX,
-	.settings = iheadset_mic_acs_tx_settings,
-	.setting_sz = ARRAY_SIZE(iheadset_mic_acs_tx_settings),
-};
-static struct snddev_icodec_data snddev_headset_mic_acs_data = {
-	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
-	.name = "headset_acs_tx",
-	.copp_id = PRIMARY_I2S_TX,
-	.profile = &iheadset_mic_acs_profile,
-	.channel_mode = 1,
-	.default_sample_rate = 48000,
-};
-static struct platform_device msm_headset_mic_acs_device = {
-	.name = "snddev_icodec",
-	.dev = { .platform_data = &snddev_headset_mic_acs_data },
-};
-
-
-
 static struct adie_codec_action_unit
 	ihs_stereo_speaker_stereo_rx_48KHz_osr256_actions[] =
 #ifdef CONFIG_LGE_AUDIO_NO_NCP_MODE
@@ -1925,34 +1795,6 @@ struct platform_device msm_bt_sco_earpiece_device = {
 struct platform_device msm_bt_sco_mic_device = {
 	.name = "msm_snddev_ecodec",
 	.dev = { .platform_data = &snddev_bt_sco_mic_data },
-};
-
-
-/* define the value for BT_SCO BTTM(AT command BT Test Mode) */
-//BTTM_RX BTTM_TX
-
-static struct snddev_ecodec_data snddev_bt_sco_bttm_earpiece_data = {
-	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
-	.name = "bt_sco_bttm_rx",
-	.copp_id = PCM_RX,
-	.channel_mode = 1,
-};
-
-static struct snddev_ecodec_data snddev_bt_sco_bttm_mic_data = {
-	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
-	.name = "bt_sco_bttm_tx",
-	.copp_id = PCM_TX,
-	.channel_mode = 1,
-};
-
-struct platform_device msm_bt_sco_bttm_earpiece_device = {
-	.name = "msm_snddev_ecodec",
-	.dev = { .platform_data = &snddev_bt_sco_bttm_earpiece_data },
-};
-
-struct platform_device msm_bt_sco_bttm_mic_device = {
-	.name = "msm_snddev_ecodec",
-	.dev = { .platform_data = &snddev_bt_sco_bttm_mic_data },
 };
 
 static struct adie_codec_action_unit itty_mic_tx_osr256_actions[] =
@@ -2371,7 +2213,7 @@ static struct platform_device msm_mic2_lb_device = {
 #endif
 
 static struct adie_codec_action_unit imic_vr_48KHz_osr256_actions[] =
-	HANDSET_RECORD_TX_PRI_MONO_OSR_256_VR;
+	HANDSET_RECORD_TX_PRI_MONO_OSR_256;
 
 static struct adie_codec_hwsetting_entry imic_vr_settings[] = {
 	{
@@ -2404,105 +2246,6 @@ static struct platform_device msm_imic_vr_device = {
 	.dev = { .platform_data = &snddev_imic_vr_data },
 };
 
-//ACS_RX
-static struct adie_codec_action_unit iearpiece_acs_48KHz_osr256_actions[] =
-	HANDSET_ACS_RX_MONO_8000_OSR_256;
-static struct adie_codec_hwsetting_entry iearpiece_acs_settings[] = {
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions = iearpiece_acs_48KHz_osr256_actions,
-		.action_sz = ARRAY_SIZE(iearpiece_acs_48KHz_osr256_actions),
-	}
-};
-static struct adie_codec_dev_profile iearpiece_acs_profile = {
-	.path_type = ADIE_CODEC_RX,
-	.settings = iearpiece_acs_settings,
-	.setting_sz = ARRAY_SIZE(iearpiece_acs_settings),
-};
-
-static struct snddev_icodec_data snddev_acs_iearpiece_data = {
-	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
-	.name = "handset_acs_rx",
-	.copp_id = 0,
-	.profile = &iearpiece_acs_profile,
-	.channel_mode = 1,
-	.default_sample_rate = 48000,
-};
-
-static struct platform_device msm_iearpiece_acs_device = {
-	.name = "snddev_icodec",
-	.dev = { .platform_data = &snddev_acs_iearpiece_data },
-};
-
-
-static struct adie_codec_action_unit imic_lgvm_record_48KHz_osr256_actions[] =
-	HANDSET_RECORD_TX_PRI_MONO_OSR_256;
-
-static struct adie_codec_hwsetting_entry imic_lgvm_record_settings[] = {
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions = imic_lgvm_record_48KHz_osr256_actions,
-		.action_sz = ARRAY_SIZE(imic_lgvm_record_48KHz_osr256_actions),
-	}
-};
-
-static struct adie_codec_dev_profile imic_lgvm_record_profile = {
-	.path_type = ADIE_CODEC_TX,
-	.settings = imic_lgvm_record_settings,
-	.setting_sz = ARRAY_SIZE(imic_lgvm_record_settings),
-};
-
-static struct snddev_icodec_data snddev_imic_lgvm_record_data = {
-	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
-	.name = "handset_lgvm_tx",
-	.copp_id = 1,
-	.profile = &imic_lgvm_record_profile,
-	.channel_mode = 1,
-	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_enable_amic_power,
-	.pamp_off = msm_snddev_disable_amic_power,
-};
-
-static struct platform_device msm_imic_lgvm_device = {
-	.name = "snddev_icodec",
-	.dev = { .platform_data = &snddev_imic_lgvm_record_data },
-};
-
-static struct adie_codec_action_unit imic_lgcam_record_48KHz_osr256_actions[] =
-	AUXIN_LGCAM_MONO_OSR_256;
-
-static struct adie_codec_hwsetting_entry imic_lgcam_record_settings[] = {
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions = imic_lgcam_record_48KHz_osr256_actions,
-		.action_sz = ARRAY_SIZE(imic_lgcam_record_48KHz_osr256_actions),
-	}
-};
-
-static struct adie_codec_dev_profile imic_lgcam_record_profile = {
-	.path_type = ADIE_CODEC_TX,
-	.settings = imic_lgcam_record_settings,
-	.setting_sz = ARRAY_SIZE(imic_lgcam_record_settings),
-};
-
-static struct snddev_icodec_data snddev_imic_lgcam_record_data = {
-	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
-	.name = "handset_lgcam_tx",
-	.copp_id = 1,
-	.profile = &imic_lgcam_record_profile,
-	.channel_mode = 1,
-	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_enable_submic_power,
-	.pamp_off = msm_snddev_disable_submic_power,
-};
-
-static struct platform_device msm_imic_lgcam_device = {
-	.name = "snddev_icodec",
-	.dev = { .platform_data = &snddev_imic_lgcam_record_data },
-};
 
 adie_codec_action_Cmd qtr8615l_cal_db[QTR8615L_CAL_DB_MAX] = {
     {iearpiece_48KHz_osr256_actions,                17}, // RCV_RX1_L_GAIN
@@ -3805,16 +3548,8 @@ static struct platform_device *snd_devices_lge_i_board[] __initdata = {
 	&msm_mic1_nc_device,
 	&msm_mic2_nc_device, 
 	&msm_mic2_lb_device,
-    &msm_iearpiece_acs_device,       //ACS_RX
-    &msm_mic1_acs_device,            //ACS_TX
+    &msm_mic1_acs_device,
     &msm_imic_vr_device,
-    &msm_imic_lgvm_device,
-    &msm_imic_lgcam_device,
-	&msm_bt_sco_bttm_earpiece_device,//BTTM_RX
-	&msm_bt_sco_bttm_mic_device,     //BTTM_TX
-  &msm_headset_stereo_acs_device,//EAR ACS_RX
-  &msm_headset_mic_acs_device,   //EAR ACS_TX
-  &msm_ispkr_stereo_vzwnavi_device,
 };
 
 #ifdef LGE_AUDIO_COMMENT_OUT_FOR_REFERENCE

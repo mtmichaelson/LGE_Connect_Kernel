@@ -53,7 +53,6 @@ enum {
 	AMI306_DEBUG_DEV_DEBOUNCE	= 1U << 4,
 	AMI306_DEBUG_GEN_INFO		= 1U << 5,
 	AMI306_DEBUG_INTR_INFO		= 1U << 6,
-	AMI306_DEBUG_SYSFS_INFO		= 1U << 7,
 };
 
 static unsigned int ami306_debug_mask = AMI306_DEBUG_USER_ERROR;
@@ -143,6 +142,10 @@ static atomic_t daemon_open_count;
 static u32 report_cnt = 0;
 
 static u8 i2c_read_addr, i2c_read_len;
+
+//seungkwan.jung
+static unsigned char ami_xyz[3]={0,};
+//seungkwan.jung
 
 static int AMI306_I2c_Read(u8 regaddr, u8 *buf, u8 buf_len)
 {
@@ -354,10 +357,10 @@ static int Identify_AMI_Chipset(void)
 {
 	char strbuf[AMI306_BUFSIZE];
 	int WIARet = 0;
-	int ret = 0;
+	int ret;
 	
-	//if( (ret=AMI306_WIA(strbuf, AMI306_BUFSIZE))!=0 )
-	//	return ret;
+	if( (ret=AMI306_WIA(strbuf, AMI306_BUFSIZE))!=0 )
+		return ret;
 		
 	sscanf(strbuf, "%x", &WIARet);	
 	
@@ -368,7 +371,7 @@ static int Identify_AMI_Chipset(void)
 		ami306_data.chipset = AMI306_CHIPSET;
 	}
 	
-	return ret;
+	return 0;
 }
 
 static int AMI306_ReadSensorData(char *buf, int bufsize)
@@ -494,14 +497,6 @@ static int AMI306_ReadSensorData2(short *buf)
 	{
 		AMID("Magnetic Raw Data1: X=%d, Y=%d, Z=%d\n", buf[0], buf[1], buf[2]);
 	}
-
-    if((buf[0]==0)&&(buf[1]==0)&&(buf[2]==0))
-    {    
-		pdata->power_on(1<<SENSOR_TYPE_DCOMPASS);
-		udelay(1000);//mdelay(1);
-		AMI306_Chipset_Init(AMI306_FORCE_MODE,ami306_data.chipset);
-		return -3;
-    }		
 
 exit_AMI306_ReadSensorData:
 	if (res <= 0) {
@@ -648,6 +643,14 @@ static int AMI306_Report_Value(int iEnable)
 		AMID("mag_status: %d\n", ami306mid_data.status);
 	}
 
+	//BEGIN:seungkwan.jung
+	ami_xyz[0] = ami306mid_data.nm.x;
+	ami_xyz[1] = ami306mid_data.nm.y;
+	ami_xyz[2] = ami306mid_data.nm.z;
+
+	//END:seungkwan.jung
+
+	
 	if (report_enable)
 		input_sync(data->input_dev);
 
@@ -688,15 +691,6 @@ static ssize_t show_sensordata_value(struct device *dev,
 	return sprintf(buf, "%s\n", strbuf);
 }
 
-static ssize_t show_sensordata_value2(struct device *dev, 
-		struct device_attribute *attr, char *buf)
-{
-	short strbuf[3]={0,};
-	
-	AMI306_ReadSensorData2((short*)strbuf);
-	
-	return sprintf(buf, "%d/%d/%d\n", strbuf[0],strbuf[1],strbuf[2]);
-}
 static ssize_t show_posturedata_value(struct device *dev, 
 		struct device_attribute *attr, char *buf)
 {
@@ -710,8 +704,6 @@ static ssize_t show_calidata_value(struct device *dev,
 {
 	char strbuf[AMI306_BUFSIZE];
 	AMI306_ReadCaliData(strbuf, AMI306_BUFSIZE);
-	if (AMI306_DEBUG_SYSFS_INFO & ami306_debug_mask)
-		AMID("%s: %d, %d, %d\n", __func__, strbuf[0], strbuf[1], strbuf[2]);
 	return sprintf(buf, "%s\n", strbuf);
 }
 
@@ -868,14 +860,10 @@ static ssize_t show_enable_value(struct device *dev, struct device_attribute *at
 {
 	if(!atomic_read(&ami306_report_enabled))
 	{
-		if (AMI306_DEBUG_SYSFS_INFO & ami306_debug_mask)
-			AMID("%s: disabled..\n", __func__);
 		return sprintf(buf, "0\n");
 	}
 	else
 	{
-		if (AMI306_DEBUG_SYSFS_INFO & ami306_debug_mask)
-			AMID("%s: enabled..\n", __func__);
 		return sprintf(buf, "1\n");
 	}
 }
@@ -884,7 +872,7 @@ static ssize_t store_enable_value(struct device *dev, struct device_attribute *a
 {
 	unsigned long val = simple_strtoul(buf, NULL, 10);
 
-	if (AMI306_DEBUG_SYSFS_INFO & ami306_debug_mask)
+	if (AMI306_DEBUG_FUNC_TRACE & ami306_debug_mask)
 		AMID("AMI306 enable %d....!\n", (int)val);
 
 	if(val == 0)
@@ -927,21 +915,52 @@ static ssize_t store_delay_value(struct device *dev, struct device_attribute *at
 	return 0;
 }
 
-static ssize_t show_report_cnt(struct device *dev, struct device_attribute *attr, char *buf)
+//BEGIN:seungkwan.jung
+static ssize_t data_x(struct device *dev, 
+		struct device_attribute *attr, char *buf)
 {
-	printk(KERN_INFO "%s: report_cnt: %d\n", __func__, report_cnt);
-
-	if( atomic_read(&ami306_report_enabled))
-		return sprintf(buf, "%d\n", report_cnt);
-	else
-		return sprintf(buf, "%d\n", -1);
+	
+	return sprintf(buf, "%d\n",ami_xyz[0]);
 }
 
+static ssize_t data_y(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+	
+	return sprintf(buf, "%d\n", ami_xyz[1]);
+}
+
+static ssize_t data_z(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+	
+	return sprintf(buf, "%d\n", ami_xyz[2]);
+
+
+}
+static ssize_t show_report_cnt(struct device *dev, struct device_attribute *attr, char *buf)
+						
+{
+	//printk(KERN_INFO "%s: report_cnt: %d\n", __func__, report_cnt);
+
+	//if( atomic_read(&ami306_report_enabled))
+		return sprintf(buf, "%d\n", report_cnt);
+	//else
+	//	return sprintf(buf, "%d\n", -1);
+
+}
+
+
+
+static DEVICE_ATTR(X, S_IRUGO, data_x, NULL);
+static DEVICE_ATTR(Y, S_IRUGO, data_y, NULL);
+static DEVICE_ATTR(Z, S_IRUGO, data_z, NULL);
+static DEVICE_ATTR(cnt, S_IRUGO, show_report_cnt, NULL);
+//END:seungkwan.jung
 static DEVICE_ATTR(chipinfo, S_IRUGO, show_chipinfo_value, NULL);
 static DEVICE_ATTR(sensordata, S_IRUGO, show_sensordata_value, NULL);
 static DEVICE_ATTR(posturedata, S_IRUGO, show_posturedata_value, NULL);
 static DEVICE_ATTR(calidata, S_IRUGO, show_calidata_value, NULL);
-static DEVICE_ATTR(mag_data, S_IRUGO, show_sensordata_value2, NULL);
 static DEVICE_ATTR(gyrodata, S_IRUGO, show_gyrodata_value, NULL);
 static DEVICE_ATTR(midcontrol, S_IRUGO | S_IWUSR, show_midcontrol_value, store_midcontrol_value );
 static DEVICE_ATTR(mode, S_IRUGO | S_IWUSR, show_mode_value, store_mode_value );
@@ -950,7 +969,7 @@ static DEVICE_ATTR(pitch, S_IRUGO | S_IWUSR, show_pitch_value, NULL);
 static DEVICE_ATTR(roll, S_IRUGO | S_IWUSR, show_roll_value, NULL);
 static DEVICE_ATTR(enable, S_IRUGO|S_IWUSR, show_enable_value, store_enable_value);
 static DEVICE_ATTR(delay, S_IRUGO|S_IWUSR, show_delay_value, store_delay_value);
-static DEVICE_ATTR(cnt, S_IRUGO|S_IWUSR, show_report_cnt, NULL);
+
 
 static struct attribute *ami306_attributes[] = {
 	&dev_attr_chipinfo.attr,
@@ -965,9 +984,15 @@ static struct attribute *ami306_attributes[] = {
 	&dev_attr_pitch.attr,
 	&dev_attr_roll.attr,	
 	&dev_attr_enable.attr,
+
 	&dev_attr_delay.attr,
-	&dev_attr_mag_data.attr,
+	//BEGIN:seungkwan.jung
+	&dev_attr_X.attr,
+	&dev_attr_Y.attr,
+	&dev_attr_Z.attr,
 	&dev_attr_cnt.attr,
+
+	//END:seungkwan.jung
 	NULL,
 };
 static struct attribute_group ami306_attribute_group = {
@@ -1820,7 +1845,7 @@ static int __devinit ami306_probe(struct i2c_client *client,
 	if (AMI306_DEBUG_FUNC_TRACE & ami306_debug_mask)
 		printk(KERN_INFO "%s: call power_on", __func__);
 	pdata->power_on(1<<SENSOR_TYPE_DCOMPASS);
-	udelay(1000);//mdelay(1);
+	udelay(300);//mdelay(5);
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 	ami306_sensor_early_suspend.suspend = ami306_early_suspend;
@@ -1868,12 +1893,12 @@ static int __devinit ami306_probe(struct i2c_client *client,
 	err = sysfs_create_group(&client->dev.kobj, &ami306_attribute_group);
 	err = device_create_file(&data->input_dev->dev, &dev_attr_enable);
 	err = device_create_file(&data->input_dev->dev, &dev_attr_delay);
-	err = device_create_file(&data->input_dev->dev, &dev_attr_mag_data);
 	err = device_create_file(&data->input_dev->dev, &dev_attr_cnt);
 	if (err) {
 		AMIE("ami306 sysfs register failed\n");
 		goto exit_sysfs_create_group_failed;
 	}
+
 	return 0;
 
 exit_sysfs_create_group_failed:	
@@ -1888,7 +1913,6 @@ exit_misc_ami306_device_register_failed:
 	input_unregister_device(data->input_dev);
 	input_free_device(data->input_dev);
 exit_kfree:
-	pdata->power_off(1<<SENSOR_TYPE_DCOMPASS);
 	kfree(data);
 exit:
 	return err;
@@ -1901,7 +1925,12 @@ static int __devexit ami306_remove(struct i2c_client *client)
 	sysfs_remove_group(&client->dev.kobj, &ami306_attribute_group);
 	device_remove_file(&data->input_dev->dev, &dev_attr_enable);
 	device_remove_file(&data->input_dev->dev, &dev_attr_delay);
-
+	//BEGIN:seungkwan.jung
+	device_remove_file(&data->input_dev->dev, &dev_attr_X);
+	device_remove_file(&data->input_dev->dev, &dev_attr_Y);
+	device_remove_file(&data->input_dev->dev, &dev_attr_Z);
+	device_remove_file(&data->input_dev->dev, &dev_attr_cnt);
+	//END:seungkwan.jung
 
 	misc_deregister(&ami306_device);
 	misc_deregister(&ami306daemon_device);
@@ -1923,23 +1952,64 @@ static int __devexit ami306_remove(struct i2c_client *client)
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 static void ami306_early_suspend(struct early_suspend *h)
 {
+#if 1//from aichi 20110831>>start
+	struct ami306_platform_data *pdata;
+	
+
+	pdata = ami306_i2c_client->dev.platform_data;
+	if (AMI306_DEBUG_FUNC_TRACE & ami306_debug_mask)
+		AMID("ami306_early_suspend....!\n");
+
+	ami306mid_data.controldata[AMI306_CB_ACTIVESENSORS] &= ~(AMIT_BIT_MAGNETIC_FIELD|AMIT_BIT_ACCELEROMETER);
+
+	//seungkwan
+	printk("seungkwan  ami306 sensor Power_OFF	suspend");
+
+
+	pdata->power_off(1<<SENSOR_TYPE_DCOMPASS);
+
+#else
 	if (AMI306_DEBUG_FUNC_TRACE & ami306_debug_mask)
 		AMID("AMI306 early_suspend....!\n");
 	//atomic_set(&ami306_report_enabled, 0);
+#endif //from aichi 20110831>>end
 }
 
 static void ami306_late_resume(struct early_suspend *h)
 {
+#if 1 //from aichi 20110831>>start
+	struct ami306_platform_data *pdata;
+	pdata = ami306_i2c_client->dev.platform_data;
+
+	if (AMI306_DEBUG_FUNC_TRACE & ami306_debug_mask)
+		AMID("ami306_late_resume....!\n");
+
+	//seungkwan
+	printk("seungkwan  ami306 sensor Power_on resume  ");
+
+	pdata->power_on(1<<SENSOR_TYPE_DCOMPASS);
+	mdelay(1);//udelay(300);
+	ami306mid_data.controldata[AMI306_CB_ACTIVESENSORS] |= (AMIT_BIT_MAGNETIC_FIELD|AMIT_BIT_ACCELEROMETER);
+	AMI306_Chipset_Init(ami306_data.mode, ami306_data.chipset);
+
+//20110222
+	write_lock(&ami306mid_data.ctrllock);
+	ami306mid_data.controldata[AMI306_CB_RUN] = 2;         // Run = 1	//resume = 2
+	write_unlock(&ami306mid_data.ctrllock);
+
+#else
 	if (AMI306_DEBUG_FUNC_TRACE & ami306_debug_mask)
 		AMID("AMI306 late_resume....!\n");
 
 	//atomic_set(&ami306_report_enabled, 1);
+#endif 	//from aichi 20110831>>end
 }
 #endif
 
 #if defined(CONFIG_PM)
 static int ami306_suspend(struct device *device)
 {
+#if !defined(CONFIG_HAS_EARLYSUSPEND) //from aichi 20110831>>start
 	struct ami306_platform_data *pdata;
 
 	pdata = device->platform_data;
@@ -1948,12 +2018,13 @@ static int ami306_suspend(struct device *device)
 
 	ami306mid_data.controldata[AMI306_CB_ACTIVESENSORS] &= ~(AMIT_BIT_MAGNETIC_FIELD|AMIT_BIT_ACCELEROMETER);
 	pdata->power_off(1<<SENSOR_TYPE_DCOMPASS);
-
+#endif 	//from aichi 20110831>>end
 	return 0;
 }
 
 static int ami306_resume(struct device *device)
 {
+#if !defined(CONFIG_HAS_EARLYSUSPEND) //from aichi 20110831>>start
 	struct ami306_platform_data *pdata;
 	pdata = ami306_i2c_client->dev.platform_data;
 
@@ -1961,7 +2032,7 @@ static int ami306_resume(struct device *device)
 		AMID("AMI306 resume....!\n");
 
 	pdata->power_on(1<<SENSOR_TYPE_DCOMPASS);
-	udelay(1000);//mdelay(1);
+	udelay(300);//mdelay(1);
 	ami306mid_data.controldata[AMI306_CB_ACTIVESENSORS] |= (AMIT_BIT_MAGNETIC_FIELD|AMIT_BIT_ACCELEROMETER);
 	AMI306_Chipset_Init(ami306_data.mode, ami306_data.chipset);
 
@@ -1969,6 +2040,7 @@ static int ami306_resume(struct device *device)
 	write_lock(&ami306mid_data.ctrllock);
 	ami306mid_data.controldata[AMI306_CB_RUN] = 2;         // Run = 1	//resume = 2
 	write_unlock(&ami306mid_data.ctrllock);
+#endif 	//from aichi 20110831>>end
 	return 0;
 }
 #endif

@@ -20,11 +20,10 @@
 #include "diagchar.h"
 #include "lg_diag_kernel_service.h"
 #include <../../../lge/include/lg_diag_testmode.h>
-#include <../../../lge/include/lg_diag_unifiedmsgtool.h> //#ifdef LG_SMS_PC_TEST
 #include <../../../lge/include/lg_diagcmd.h>
 #include <linux/slab.h>
 #include <../../../lge/include/lg_diag_udm.h>
-#include <../../../lge/include/lge_diag_eri.h>
+
 
 // LG_FW : 2011.07.07 moon.yongho : saving webdload status variable to eMMC. -----------[[
 #include <../../../lge/include/lg_diag_dload.h>
@@ -69,14 +68,6 @@ PACK (void *)LGE_ICDProcess (PACK (void *)req_pkt_ptr, uint16 pkg_len);
 #ifdef CONFIG_LGE_DLOAD_SRD 
 PACK (void *)LGE_Dload_SRD (PACK (void *)req_pkt_ptr, uint16 pkg_len);
 #endif
-//#ifdef LG_SMS_PC_TEST
-PACK (void *)LGF_MsgTest (PACK (void *)req_pkt_ptr, uint16 pkg_len);
-//#endif
-
-//#ifdef CONFIG_LGE_DIAG_ERI 
-PACK (void *)LGE_ERI (PACK (void *)req_pkt_ptr,uint16	pkt_len );
-//#endif 
-
 
 // LG_FW : 2011.07.07 moon.yongho : saving webdload status variable to eMMC. ----------[[
 #ifdef LG_FW_WEB_DOWNLOAD	
@@ -121,9 +112,6 @@ static const diagpkt_user_table_entry_type registration_table[] =
 #ifdef CONFIG_LGE_DIAG_UDM
 	{DIAG_UDM_SMS_MODE , DIAG_UDM_SMS_MODE , LGF_Udm},
 #endif
-//#ifdef LG_SMS_PC_TEST
-	{DIAG_SMS_TEST_F , DIAG_SMS_TEST_F , LGF_MsgTest},
-//#endif
 #ifdef CONFIG_LGE_DIAG_ICD
 	{DIAG_ICD_F, DIAG_ICD_F, LGE_ICDProcess},
 #endif
@@ -131,9 +119,6 @@ static const diagpkt_user_table_entry_type registration_table[] =
 	{DIAG_USET_DATA_BACKUP, DIAG_USET_DATA_BACKUP, LGE_Dload_SRD},
 #endif
 
-//#ifdef CONFIG_LGE_DIAG_ERI 
-	{DIAG_ERI_CMD_F, DIAG_ERI_CMD_F, LGE_ERI},
-//#endif 
 // LG_FW : 2011.07.07 moon.yongho : saving webdload status variable to eMMC. ----------[[
 #ifdef LG_FW_WEB_DOWNLOAD	
 	{DIAG_WEBDLOAD_COMMON_F  , DIAG_WEBDLOAD_COMMON_F  , LGE_WebDload_SRD},
@@ -309,7 +294,7 @@ static ssize_t write_cmd_pkt_length(struct device *dev,
 }
 
 /* LGE_CHANGES_S, [dongp.kim@lge.com], 2010-01-10, <LGE_FACTORY_TEST_MODE for WLAN RF Test > */
-#if 0
+
 static ssize_t read_wlan_status(struct device *dev, struct device_attribute *attr,
 				char *buf)
 {
@@ -353,7 +338,6 @@ static ssize_t write_wlan_status(struct device *dev,
   
 	return size;
 }
-#endif 
 
 #ifdef CONFIG_LGE_DIAG_WMC
 static ssize_t read_wmc_cmd_pkt(struct device *dev, struct device_attribute *attr,
@@ -470,9 +454,7 @@ static ssize_t write_sms_status_new(struct device *dev,
 static DEVICE_ATTR(cmd_pkt, S_IRUGO | S_IWUSR,read_cmd_pkt, write_cmd_pkt);
 static DEVICE_ATTR(length, S_IRUGO | S_IWUSR,read_cmd_pkt_length, write_cmd_pkt_length);
 /* LGE_CHANGES_S, [dongp.kim@lge.com], 2010-01-10, <LGE_FACTORY_TEST_MODE for WLAN RF Test > */
-#if 0
 static DEVICE_ATTR(wlan_status, S_IRUGO | S_IWUSR,read_wlan_status, write_wlan_status);
-#endif 
 /* LGE_CHANGES_E, [dongp.kim@lge.com], 2010-01-10, <LGE_FACTORY_TEST_MODE for WLAN RF Test > */
 
 #ifdef CONFIG_LGE_DIAG_WMC
@@ -509,14 +491,13 @@ int lg_diag_create_file(struct platform_device *pdev)
 		return ret;
 	}
 	/* LGE_CHANGES_S, [dongp.kim@lge.com], 2010-01-10, <LGE_FACTORY_TEST_MODE for WLAN RF Test > */
-#if 0    //LGE_CHANG, [dongp.kim@lge.com], 2010-10-09, deleting #ifdef LG_FW_WLAN_TEST for enabling Wi-Fi Testmode menus
+
 	ret = device_create_file(&pdev->dev, &dev_attr_wlan_status);
 	if (ret) {
 		printk( KERN_DEBUG "LG_FW : diag device file3 create fail\n");
 		device_remove_file(&pdev->dev, &dev_attr_wlan_status);
 		return ret;
 	}
-#endif
 	/* LGE_CHANGES_E, [dongp.kim@lge.com], 2010-01-10, <LGE_FACTORY_TEST_MODE for WLAN RF Test > */	
 #ifdef CONFIG_LGE_DIAG_WMC
 	ret = device_create_file(&pdev->dev, &dev_attr_wmc_cmd_pkt);
@@ -588,7 +569,7 @@ int lg_diag_remove_file(struct platform_device *pdev)
 {
 	device_remove_file(&pdev->dev, &dev_attr_cmd_pkt);
 
-#if 0    //LGE_CHANG, [dongp.kim@lge.com], 2010-10-09, deleting #ifdef LG_FW_WLAN_TEST for enabling Wi-Fi Testmode menus
+#if 1    //LGE_CHANG, [dongp.kim@lge.com], 2010-10-09, deleting #ifdef LG_FW_WLAN_TEST for enabling Wi-Fi Testmode menus
 	/* LGE_CHANGES_S [dongp.kim@lge.com], 2010-01-10, <LGE_FACTORY_TEST_MODE for WLAN RF Test > */
 	device_remove_file(&pdev->dev, &dev_attr_wlan_status);
 	/* LGE_CHANGES_E, [dongp.kim@lge.com], 2010-01-10, <LGE_FACTORY_TEST_MODE for WLAN RF Test > */

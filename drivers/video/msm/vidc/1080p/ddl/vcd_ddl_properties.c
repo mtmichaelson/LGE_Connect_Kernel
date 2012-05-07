@@ -1706,7 +1706,9 @@ u32 ddl_set_default_decoder_buffer_req(struct ddl_decoder_data *decoder,
 	input_buf_req->min_count = 1;
 	input_buf_req->actual_count = input_buf_req->min_count + 1;
 	input_buf_req->max_count = DDL_MAX_BUFFER_COUNT;
-	input_buf_req->sz = (1024 * 1024);
+	//START : [i_svlte_vzw][QCT00701902] Change value of input buffer for 1080p decoder. hyun.ko@lge.com 2011-12-16
+	input_buf_req->sz = (2 * 1024 * 1024);
+	//END : [i_svlte_vzw][QCT00701902] Change value of input buffer for 1080p decoder. hyun.ko@lge.com 2011-12-16
 	input_buf_req->align = DDL_LINEAR_BUFFER_ALIGN_BYTES;
 	decoder->min_input_buf_req = *input_buf_req;
 	return true;

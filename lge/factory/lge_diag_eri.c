@@ -209,9 +209,6 @@ PACK (void *)LGE_ERI (
 
 
 //restore eri.bin  after factory reset command 
-#ifndef AID_RADIO
-#define AID_RADIO         1001  /* telephony subsystem, RIL */
-#endif
 
 int eri_factory_direct_write(const char *path , char *eri_data, int size )
 {
@@ -239,9 +236,6 @@ int eri_factory_direct_write(const char *path , char *eri_data, int size )
 	sys_close(fd);
 	set_fs(oldfs);	
 
-	//change owner and mode so that any apks are able to access
-	sys_chown(path, AID_RADIO, AID_RADIO);
-	sys_chmod(path, S_IRWXUGO);
 	return 1;
 }
 /* LGE_CHANGE_ [jaekyung83.lee@lge.com] 2011-04-06. ERI UTS Test  [END]*/

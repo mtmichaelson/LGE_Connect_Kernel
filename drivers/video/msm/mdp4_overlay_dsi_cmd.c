@@ -48,6 +48,10 @@ static unsigned long  tout_expired;
 
 static int vsync_start_y_adjust = 4;
 
+#if defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+extern void lm3537_lcd_backlight_set_level(int level);
+#endif
+
 struct timer_list dsi_clock_timer;
 
 static int writeback_offset;
@@ -464,7 +468,9 @@ void mdp4_dma_p_done_dsi(struct mdp_dma_data *dma)
 	wmb();
 	/* trigger dsi cmd engine */
 	mipi_dsi_cmd_mdp_sw_trigger();
-
+#if defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+		lm3537_lcd_backlight_set_level(100); /* backlight on by default brightness */
+#endif
 	mdp_pipe_ctrl(MDP_OVERLAY0_BLOCK, MDP_BLOCK_POWER_OFF, TRUE);
 }
 
@@ -527,6 +533,9 @@ void mdp4_overlay0_done_dsi_cmd(struct mdp_dma_data *dma)
 	/* trigger dsi cmd engine */
 	mipi_dsi_cmd_mdp_sw_trigger();
 	mdp_disable_irq_nosync(MDP_OVERLAY0_TERM);
+#if defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+	lm3537_lcd_backlight_set_level(100); /* backlight on by default brightness */
+#endif
 }
 
 void mdp4_dsi_cmd_overlay_restore(void)
@@ -657,6 +666,9 @@ void mdp4_dsi_cmd_overlay_kickoff(struct msm_fb_data_type *mfd,
 	if (dsi_pipe->blt_addr == 0) {
 		/* trigger dsi cmd engine */
 		mipi_dsi_cmd_mdp_sw_trigger();
+#if defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+	lm3537_lcd_backlight_set_level(100); /* backlight on by default brightness */
+#endif
 	}
 }
 

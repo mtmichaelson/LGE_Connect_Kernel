@@ -58,13 +58,8 @@ PARTICULAR PURPOSE.  See the * GNU General Public License for more details. */
 
 //#define GP_MN_M_DEFAULT			        7
 //#define GP_MN_N_DEFAULT			        1141
-#if 1//def CONFIG_LGE_LGT_AUDIO
 #define GP_MN_M_DEFAULT			        2
 #define GP_MN_N_DEFAULT			        1304
-#else // dongsung.shin 2011.7.26 change VZW freq. 29.4 -> 29.04  
-#define GP_MN_M_DEFAULT			        2
-#define GP_MN_N_DEFAULT			        1322
-#endif
 #define GP_MN_D_DEFAULT		            	(GP_MN_N_DEFAULT >> 1) 
 #define PWM_MAX_DUTY GP_MN_N_DEFAULT - GP_MN_M_DEFAULT
 #define PWM_MIN_DUTY GP_MN_M_DEFAULT
@@ -178,7 +173,7 @@ static int vibrator_pwm_set(int enable, int amp)
 			if (D_VAL > PWM_MAX_DUTY ) D_VAL = PWM_MAX_DUTY;
 			if (D_VAL < PWM_MIN_DUTY ) D_VAL = PWM_MIN_DUTY;
 						
-			printk(KERN_INFO "LGE: %s D_VAL = 0x%X %d\n", __func__,D_VAL,D_VAL);
+//			printk(KERN_INFO "LGE: %s D_VAL = 0x%X %d\n", __func__,D_VAL,D_VAL);
 
 			writel(D_VAL & GPMN_D_MASK, vib_base_ptr + GP_MN_CLK_DUTY_REG);
 //			gpio_direction_output(GPIO_LIN_MOTOR_PWM, 1);

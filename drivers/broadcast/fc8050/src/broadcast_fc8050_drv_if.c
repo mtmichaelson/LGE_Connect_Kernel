@@ -27,16 +27,7 @@ int broadcast_drv_if_power_on(void)
 	{
 		gpMPI_Buffer = kmalloc(TDMB_MPI_BUF_SIZE*TDMB_MPI_BUF_CHUNK_NUM, GFP_KERNEL);
 	}
-//LGE_BROADCAST_I_0907
-	retval = tunerbb_drv_fc8050_stop();
-
-	retval = tunerbb_drv_fc8050_power_off();
-
-	if(retval == TRUE)
-	{
-		res = OK;
-	}
-//LGE_BROADCAST_I_0907
+	
 	retval = tunerbb_drv_fc8050_power_on();
 
 	if(retval == TRUE)
@@ -149,7 +140,7 @@ int broadcast_drv_if_get_ch_info(char* buffer, unsigned int* buffer_size)
 
 	if(buffer == NULL || buffer_size == NULL)
 	{
-		printk("broadcast_drv_if_get_ch_info argument error\n");
+		printk("broadcast_tdmb_get_ch_info argument error\n");
 		return rc;
 	}
 
@@ -248,14 +239,16 @@ int broadcast_drv_if_isr(void)
 	read_buffer_ptr = gpMPI_Buffer + gBBBuffer_widx*TDMB_MPI_BUF_SIZE;
 	
 	tunerbb_drv_fc8050_read_data(read_buffer_ptr, &read_buffer_size);
-	if(read_buffer_size > 0)
+	tdmb_real_read_size[gBBBuffer_widx] = read_buffer_size;
+
+	/* update write index */
+	if ( 0 < read_buffer_size )
 	{
-		tdmb_real_read_size[gBBBuffer_widx] = read_buffer_size;
 		gBBBuffer_widx = ((gBBBuffer_widx + 1)%TDMB_MPI_BUF_CHUNK_NUM);
-		return OK;
 	}
 
 	//printk("broadcast_tdmb_read_data, ridx=%d, widx=%d, wsize=%d\n",gBBBuffer_ridx, gBBBuffer_widx,  read_buffer_size);
 	
-	return ERROR;
+	return OK;
 }
+

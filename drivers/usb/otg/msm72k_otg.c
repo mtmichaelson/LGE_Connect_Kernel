@@ -43,6 +43,9 @@
 static void otg_reset(struct otg_transceiver *xceiv, int phy_reset);
 static void msm_otg_set_vbus_state(int online);
 static void msm_otg_set_id_state(int online);
+#if 1//def CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
+extern void usb_charge_only_softconnect(void);
+#endif
 
 struct msm_otg *the_msm_otg;
 
@@ -764,6 +767,10 @@ static int msm_otg_suspend(struct msm_otg *dev)
 	if (dev->pdata->config_vddcx)
 		dev->pdata->config_vddcx(0);
 	pr_info("%s: usb in low power mode\n", __func__);
+
+#if 1//def CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
+	usb_charge_only_softconnect();
+#endif
 
 out:
 	enable_irq(dev->irq);

@@ -795,7 +795,7 @@ int mmc_attach_sd(struct mmc_host *host, u32 ocr)
 			{
 				g_sd_power_dircect_ctrl = 1;
 				mmc_power_off(host);
-				mdelay(10);
+				mdelay(200);
 				mmc_power_up(host);
 				mmc_select_voltage(host, host->ocr);
 				mdelay(10);

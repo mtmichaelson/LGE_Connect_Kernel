@@ -87,9 +87,6 @@ struct kgsl_pwrctrl {
 	bool pwrrail_first;
 	s64 time;
 	unsigned int no_switch_cnt;
-#ifndef QCT_PATCH_GPU_TZ_SKIP
-	unsigned int skip_cnt;
-#endif
 	unsigned int idle_pass;
 	struct kgsl_busy busy;
 };

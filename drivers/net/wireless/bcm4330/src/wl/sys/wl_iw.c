@@ -6732,14 +6732,7 @@ get_softap_auto_channel(struct net_device *dev, struct ap_profile *ap)
 			if ((chosen == 1) && (!rescan++))
 				goto auto_channel_retry;
 			WL_SOFTAP(("Set auto channel = %d\n", chosen));
-// hotspot_patch_1020 {
-#if !defined(CONFIG_LGE_BCM432X_PATCH) // Tiburona
 			ap->channel = chosen;
-#else
-			ap->channel = CHSPEC_CHANNEL(chosen);
-			printf("### %s : %d : channel = %d ###\n", __func__, __LINE__, ap->channel);
-#endif
-// hotspot_patch_1020 }
 			if ((res = dev_wlc_ioctl(dev, WLC_DOWN, &updown, sizeof(updown))) < 0) {
 				WL_ERROR(("%s fail to set up err =%d\n", __FUNCTION__, res));
 				goto fail;
@@ -6858,16 +6851,6 @@ set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 		WL_TRACE(("\n>in %s: apsta set result: %d \n", __FUNCTION__, res));
 #endif /* AP_ONLY */
 
-// hotspot_patch_1020 {
-#if defined(CONFIG_LGE_BCM432X_PATCH) // Tiburona
-		mpc = 0;
-		WL_SOFTAP(("set mpc:\n"));
-		if ((res = dev_wlc_intvar_set(dev, "mpc", mpc))) {
-			WL_ERROR(("%s fail to set mpc\n", __FUNCTION__));
-			goto fail;
-		}
-#endif
-// hotspot_patch_1020 }
 		updown = 1;
 		if ((res = dev_wlc_ioctl(dev, WLC_UP, &updown, sizeof(updown))) < 0) {
 			WL_ERROR(("%s fail to set apsta \n", __FUNCTION__));

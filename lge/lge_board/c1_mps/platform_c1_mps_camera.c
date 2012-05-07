@@ -30,26 +30,22 @@
 #include <linux/bootmem.h>
 #include <mach/board.h>
 #include <mach/msm_bus_board.h>
-#include "board_i_atnt.h"
-#include "devices_i_atnt.h"
+#include "board_c1_mps.h"
+#include "devices_c1_mps.h"
 
 
-/* IMX105 Main Camera - 8M Bayer Camera*/
+/* MT9P017 Main Camera - 5M Bayer Camera*/
 #define M_CAM_MCLK						32
 #define M_CAM_SDA						47
 #define M_CAM_SCL						48
 #define M_CAM_RESET_N					157
-#define M_CAM_I2C_SLAVE_ADDR			0x1A>>1
+#define M_CAM_I2C_SLAVE_ADDR			0x6C>>2
 
-#if defined(LG_HW_REV1)
 #define M_CAM_VCM_EN					156
-#else
-#define M_CAM_VCM_EN					94
-#endif
 
-/* MT9M114 VT Camera - 1.3M SOC Camera*/
+/* MT9V113 VT Camera - 0.3M SOC Camera*/
 #define VT_CAM_RESET_N					57
-#define VT_CAM_I2C_SLAVE_ADDR			0x48>>1
+#define VT_CAM_I2C_SLAVE_ADDR			0x7A>>1
 
 /* LM3559 Flash LED driver*/
 #define FLASH_LED_I2C_SLAVE_ADDR		0xA6>>1
@@ -197,15 +193,15 @@ static struct i2c_board_info cam_i2c_flash_info[] = {
 #endif
 
 /*========================================================================
-	  LGE Camera Sensor  (Main Camera : IMX105 , VT Camera : MT9M114)
+	  LGE Camera Sensor  (Main Camera : MT9P017 , VT Camera : MT9V113)
   ======================================================================*/
-#ifdef CONFIG_LGE_SENSOR_IMX105
-static struct msm_camera_sensor_flash_data flash_imx105 = {
-	.flash_type		= MSM_CAMERA_FLASH_LED,
+#ifdef CONFIG_LGE_SENSOR_MT9P017
+static struct msm_camera_sensor_flash_data flash_mt9p017 = {
+	.flash_type		= MSM_CAMERA_FLASH_NONE,
 };
 
-static struct msm_camera_sensor_info msm_camera_sensor_imx105_data = {
-	.sensor_name	= "imx105",
+static struct msm_camera_sensor_info msm_camera_sensor_mt9p017_data = {
+	.sensor_name	= "mt9p017",
 	.sensor_reset	= M_CAM_RESET_N,
 	.sensor_pwd		= 85,
 	.vcm_pwd		= M_CAM_VCM_EN,
@@ -213,23 +209,23 @@ static struct msm_camera_sensor_info msm_camera_sensor_imx105_data = {
 	.pdata			= &msm_camera_device_data,
 	.resource		= msm_camera_resources,
 	.num_resources	= ARRAY_SIZE(msm_camera_resources),
-	.flash_data		= &flash_imx105,
+	.flash_data		= &flash_mt9p017,
 	.csi_if			= 1
 };
-struct platform_device msm_camera_sensor_imx105 = {
-	.name	= "msm_camera_imx105",
+struct platform_device msm_camera_sensor_mt9p017 = {
+	.name	= "msm_camera_mt9p017",
 	.dev	= {
-		.platform_data = &msm_camera_sensor_imx105_data,
+		.platform_data = &msm_camera_sensor_mt9p017_data,
 	},
 };
 #endif
-#ifdef CONFIG_LGE_SENSOR_MT9M114
-static struct msm_camera_sensor_flash_data flash_mt9m114 = {
+#ifdef CONFIG_LGE_SENSOR_MT9V113
+static struct msm_camera_sensor_flash_data flash_mt9v113 = {
 	.flash_type		= MSM_CAMERA_FLASH_NONE,
 };
 
-static struct msm_camera_sensor_info msm_camera_sensor_mt9m114_data = {
-	.sensor_name	= "mt9m114",
+static struct msm_camera_sensor_info msm_camera_sensor_mt9v113_data = {
+	.sensor_name	= "mt9v113",
 	.sensor_reset	= VT_CAM_RESET_N,
 	.sensor_pwd		= 85,
 	.vcm_pwd		= 1,
@@ -237,28 +233,28 @@ static struct msm_camera_sensor_info msm_camera_sensor_mt9m114_data = {
 	.pdata			= &msm_camera_device_data_vt_cam,
 	.resource		= msm_camera_resources,
 	.num_resources	= ARRAY_SIZE(msm_camera_resources),
-	.flash_data		= &flash_mt9m114,
+	.flash_data		= &flash_mt9v113,
 	.csi_if			= 1
 };
 
-struct platform_device msm_camera_sensor_mt9m114 = {
-	.id 	= 0,
-	.name	= "msm_camera_mt9m114",
+struct platform_device msm_camera_sensor_vtcam = {
+//	.id 	= 0,
+	.name	= "msm_camera_mt9v113",
 	.dev	= {
-		.platform_data = &msm_camera_sensor_mt9m114_data,
+		.platform_data = &msm_camera_sensor_mt9v113_data,
 	},
 };
 #endif
 
 static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
-	#ifdef CONFIG_LGE_SENSOR_IMX105
+	#ifdef CONFIG_LGE_SENSOR_MT9P017
 	{
-		I2C_BOARD_INFO("imx105", M_CAM_I2C_SLAVE_ADDR),
+		I2C_BOARD_INFO("mt9p017", M_CAM_I2C_SLAVE_ADDR),
 	},
 	#endif
-	#ifdef CONFIG_LGE_SENSOR_MT9M114
+	#ifdef CONFIG_LGE_SENSOR_MT9V113
 	{
-		I2C_BOARD_INFO("mt9m114", VT_CAM_I2C_SLAVE_ADDR),
+		I2C_BOARD_INFO("mt9v113", VT_CAM_I2C_SLAVE_ADDR),
 	},
 	#endif
 };
@@ -289,11 +285,11 @@ static struct platform_device msm_gemini_device = {
 #endif
 
 static struct platform_device *camera_devices[] __initdata = {
-#ifdef CONFIG_LGE_SENSOR_IMX105
-		&msm_camera_sensor_imx105,
+#ifdef CONFIG_LGE_SENSOR_MT9P017
+		&msm_camera_sensor_mt9p017,
 #endif
-#ifdef CONFIG_LGE_SENSOR_MT9M114
-		&msm_camera_sensor_mt9m114,
+#ifdef CONFIG_LGE_SENSOR_MT9V113
+		&msm_camera_sensor_vtcam,
 #endif
 #ifdef CONFIG_MSM_GEMINI
 		&msm_gemini_device,

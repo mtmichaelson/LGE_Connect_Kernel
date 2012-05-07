@@ -38,7 +38,8 @@
 #ifdef LGE_FW_MDM_FATAL_NO_HIGH
 #define MDM2AP_ERRFATAL_GPIO 133
 struct timer_list fatal_timer;
-#endif 
+#endif
+
 
 #define SDIO_DEBUG_CH_INFO
 #ifdef	SDIO_DEBUG_CH_INFO
@@ -93,19 +94,20 @@ static struct workqueue_struct *sdio_debug_wq;
 
 struct sdio_channel *sdio_debug_ch;
 
-#ifdef	LGE_FW_MDM_FATAL_NO_HIGH
+#ifdef LGE_FW_MDM_FATAL_NO_HIGH
 static void sdio_debug_mdm_fatal_time_func(unsigned long v)
 {
-	del_timer(&fatal_timer);
- 	if (gpio_get_value(MDM2AP_ERRFATAL_GPIO) != 1)
-	{
-		LTE_INFO("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");	
-		LTE_INFO("ULS sent from MDM, But MDM error fatal gpio doesn't go to high within 10 seconds!!!\n");	
-		subsystem_restart("external_modem");
- 	}
+       del_timer(&fatal_timer);
+       if (gpio_get_value(MDM2AP_ERRFATAL_GPIO) != 1)
+       {
+               LTE_INFO("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+               LTE_INFO("ULS sent from MDM, But MDM error fatal gpio doesn't go to high within 10 seconds!!!\n");
+               subsystem_restart("external_modem");
+       }
 
 }
 #endif
+
 
 static void sdio_debug_display_uls_log(void *buff)
 {
@@ -118,13 +120,15 @@ static void sdio_debug_display_uls_log(void *buff)
 
 	g_uls_rx_data.rx_data = *((tULS_Rx_Data *)buff);
 	g_uls_rx_data.valid		= true;		// set to true after copying uls_log
-#ifdef	LGE_FW_MDM_FATAL_NO_HIGH
-	init_timer(&fatal_timer);
-	fatal_timer.expires = 10*HZ + jiffies;  // 10 second 
-	fatal_timer.data = 1;
-	fatal_timer.function = &sdio_debug_mdm_fatal_time_func; /* timer handler */
-	add_timer(&fatal_timer);
+
+#ifdef LGE_FW_MDM_FATAL_NO_HIGH
+       init_timer(&fatal_timer);
+       fatal_timer.expires = 10*HZ + jiffies;  // 10 second 
+       fatal_timer.data = 1;
+       fatal_timer.function = &sdio_debug_mdm_fatal_time_func; /* timer handler */
+       add_timer(&fatal_timer);
 #endif
+
 }
 
 static void sdio_debug_read(struct work_struct *work)

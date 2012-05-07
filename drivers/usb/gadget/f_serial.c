@@ -1071,13 +1071,6 @@ int fserial_nmea_bind_config(struct usb_configuration *c)
 	return gser_bind_config(c, 1);
 }
 
-#ifndef CONFIG_LGE_USB_GADGET_DRIVER
-static struct android_usb_function nmea_function = {
-	.name = "nmea",
-	.bind_config = fserial_nmea_bind_config,
-};
-#endif
-
 #ifdef CONFIG_LGE_USB_TWO_MODEM
 static struct android_usb_function nmea_function = {
 	.name = "nmea",

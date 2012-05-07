@@ -265,7 +265,6 @@ struct k3dh_acc_data {
   int on_before_early_suspend;
 
   u8 sensitivity;
-
   u8 resume_state[RESUME_ENTRIES];
 
   int irq1;
@@ -290,7 +289,8 @@ enum {
 
 unsigned int ena_mask[ID_MAX] = { ENA_MASK_ACC, ENA_MASK_FLIP, ENA_MASK_TAP};
 
-static int k3dh_xyz[3] = {0,};
+static unsigned char k3dh_xyz[3] = {0,};
+static int acc_xyz[3] = {0,};
 static u32 report_cnt = 0;
 
 /*
@@ -329,11 +329,11 @@ static int k3dh_acc_i2c_read(struct k3dh_acc_data *acc, u8 * buf, int len)
 //			msleep_interruptible(I2C_RETRY_DELAY);
 //	} while ((err != 2) && (++tries < I2C_RETRIES));
 
-	if (err != 2) 
-	{
-		dev_err(&acc->client->dev, "read transfer error\n");
-		err = -EIO;
-	} else {
+		if (err != 2) 
+		{
+//			dev_err(&acc->client->dev, "read transfer error\n");
+			err = -EIO;
+	}else{
 		err = 0;
 	}
 
@@ -362,12 +362,12 @@ static int k3dh_acc_i2c_write(struct k3dh_acc_data *acc, u8 * buf, int len)
 //			msleep_interruptible(I2C_RETRY_DELAY);
 //	} while ((err != 1) && (++tries < I2C_RETRIES));
 
-	if (err != 1) 
-	{
-		dev_err(&acc->client->dev, "write transfer error\n");
-		err = -EIO;
-	} else {
-		err = 0;
+		if (err != 1) 
+		{
+//			dev_err(&acc->client->dev, "write transfer error\n");
+			err = -EIO;
+	}else{
+			err = 0;
 	}
 
 	return err;
@@ -832,17 +832,17 @@ static int k3dh_acc_get_acceleration_data(struct k3dh_acc_data *acc,int *xyz)
     hw_d[1] = (((s16) ((acc_data[3] << 8) | acc_data[2])) >> 4);
     hw_d[2] = (((s16) ((acc_data[5] << 8) | acc_data[4])) >> 4);
 
-    //k3dh_xyz[0] = (unsigned char)(hw_d[0] >> 4);
-    //k3dh_xyz[1] = (unsigned char)(hw_d[1] >> 4);
-    //k3dh_xyz[2] = (unsigned char)(hw_d[2] >> 4);
+    k3dh_xyz[0] = (unsigned char)(hw_d[0] >> 4);
+    k3dh_xyz[1] = (unsigned char)(hw_d[1] >> 4);
+    k3dh_xyz[2] = (unsigned char)(hw_d[2] >> 4);
 
     hw_d[0] = hw_d[0] * acc->sensitivity;
     hw_d[1] = hw_d[1] * acc->sensitivity;
     hw_d[2] = hw_d[2] * acc->sensitivity;
 
-    k3dh_xyz[0] = xyz[0] = ((acc->pdata->negate_x) ? (-hw_d[acc->pdata->axis_map_x]) : (hw_d[acc->pdata->axis_map_x]));
-    k3dh_xyz[1] = xyz[1] = ((acc->pdata->negate_y) ? (-hw_d[acc->pdata->axis_map_y]) : (hw_d[acc->pdata->axis_map_y]));
-    k3dh_xyz[2] = xyz[2] = ((acc->pdata->negate_z) ? (-hw_d[acc->pdata->axis_map_z]) : (hw_d[acc->pdata->axis_map_z]));
+    xyz[0] = ((acc->pdata->negate_x) ? (-hw_d[acc->pdata->axis_map_x]) : (hw_d[acc->pdata->axis_map_x]));
+    xyz[1] = ((acc->pdata->negate_y) ? (-hw_d[acc->pdata->axis_map_y]) : (hw_d[acc->pdata->axis_map_y]));
+    xyz[2] = ((acc->pdata->negate_z) ? (-hw_d[acc->pdata->axis_map_z]) : (hw_d[acc->pdata->axis_map_z]));
 
     if(DEBUG_DEV_DEBOUNCE & debug_mask)
 		printk(KERN_INFO "%s read x=%d, y=%d, z=%d\n",K3DH_ACC_DEV_NAME, xyz[0], xyz[1], xyz[2]);
@@ -850,7 +850,7 @@ static int k3dh_acc_get_acceleration_data(struct k3dh_acc_data *acc,int *xyz)
     return err;
 }
 
-#ifndef CONFIG_LGE_SENSOR_FUSION
+//#ifndef CONFIG_LGE_SENSOR_FUSION
 static int k3dh_guesture_click_src(struct k3dh_acc_data *acc,int *data)
 {
     int err = -1;
@@ -915,7 +915,7 @@ static int k3dh_guesture_intr_src(struct k3dh_acc_data *acc,int *data)
     *data = buf[0];
     return err;
 }
-#endif
+//#endif
 
 static void k3dh_acc_report_values(struct k3dh_acc_data *acc, int *xyz)
 {
@@ -926,10 +926,14 @@ static void k3dh_acc_report_values(struct k3dh_acc_data *acc, int *xyz)
     input_report_abs(acc->input_dev, ABS_X, xyz[0]);
     input_report_abs(acc->input_dev, ABS_Y, xyz[1]);
     input_report_abs(acc->input_dev, ABS_Z, xyz[2]);
+
+	acc_xyz[0]= xyz[0];
+	acc_xyz[1]=	xyz[1];
+	acc_xyz[2]=	xyz[2];
     input_sync(acc->input_dev);
 }
 
-#ifndef CONFIG_LGE_SENSOR_FUSION
+//#ifndef CONFIG_LGE_SENSOR_FUSION
 
 static void k3dh_tap_report_values(struct k3dh_acc_data *acc, int data)
 {
@@ -955,14 +959,14 @@ static void k3dh_flip_report_values(struct k3dh_acc_data *acc, int *xyz, int dat
 		input_sync(acc->input_dev_flip);
     }
 }
-#endif
+//#endif
 
 static int k3dh_acc_enable(struct k3dh_acc_data *acc, int dev_id)
 {
     int err;
     
     if(DEBUG_FUNC_TRACE & debug_mask)
-		printk(KERN_INFO "%s: line: %d\n",__func__, __LINE__);
+		printk(KERN_INFO "%s: line: %d, id: %d\n",__func__, __LINE__, dev_id);
 
     if(dev_id == ID_RESUME)
     {
@@ -971,7 +975,7 @@ static int k3dh_acc_enable(struct k3dh_acc_data *acc, int dev_id)
     	if(acc->on_before_suspend||acc->on_before_early_suspend)
 		{
 			if(acc->on_before_suspend)
-	    	atomic_set(&acc->enabled, acc->on_before_suspend);
+	    	    atomic_set(&acc->enabled, acc->on_before_suspend);
 			else if (acc->on_before_early_suspend)
 				atomic_set(&acc->enabled, acc->on_before_early_suspend);
 		    if(DEBUG_DEV_STATUS & debug_mask)
@@ -1034,6 +1038,14 @@ static int k3dh_acc_enable(struct k3dh_acc_data *acc, int dev_id)
 #else
 				schedule_delayed_work(&acc->input_work, 
 					    msecs_to_jiffies(acc->pdata->poll_interval));
+#endif
+			}
+			else
+			{
+#ifdef CONFIG_LGE_SENSOR_FUSION
+				acc->enable |= (ena_mask[ID_ACC]);
+#else
+				acc->enable |= (ena_mask[dev_id]);
 #endif
 			}
 		}
@@ -1455,10 +1467,10 @@ static void k3dh_acc_input_work_func(struct work_struct *work)
 	struct k3dh_acc_data *acc;
 
 	int xyz[3] = { 0 };
-#ifndef CONFIG_LGE_SENSOR_FUSION
+//#ifndef CONFIG_LGE_SENSOR_FUSION
 	int  click    = 0;
 	int  intr_src = 0;
-#endif
+//#endif
 	int err;
 
 	if(DEBUG_FUNC_TRACE & debug_mask)
@@ -1479,7 +1491,7 @@ static void k3dh_acc_input_work_func(struct work_struct *work)
 	{
 		dev_err(&acc->client->dev, "get_acceleration_data failed\n");
 	}
-#ifndef CONFIG_LGE_SENSOR_FUSION  
+//#ifndef CONFIG_LGE_SENSOR_FUSION  
 	err = k3dh_guesture_click_src(acc, &click);
 	if (err < 0)
 	{
@@ -1491,14 +1503,14 @@ static void k3dh_acc_input_work_func(struct work_struct *work)
 	{
  		dev_err(&acc->client->dev, "k3dh_guesture_intr_src failed\n");
   }
-#endif
+//#endif
 
   if(acc->enable & (ena_mask[ID_ACC]))
   {
     k3dh_acc_report_values(acc,xyz);
   }
 
-#ifndef CONFIG_LGE_SENSOR_FUSION
+//#ifndef CONFIG_LGE_SENSOR_FUSION
   if(acc->enable & (ena_mask[ID_TAP]))
   {
     k3dh_tap_report_values(acc,click);
@@ -1507,7 +1519,7 @@ static void k3dh_acc_input_work_func(struct work_struct *work)
   {
     k3dh_flip_report_values(acc,xyz,intr_src);
   }
-#endif
+//#endif
 
 #ifdef USE_HR_TIMER
 	hrtimer_start(&acc->htimer,
@@ -1627,6 +1639,7 @@ static ssize_t k3dh_show_enable(struct device *dev, struct device_attribute *att
 		return sprintf(buf, "0\n");
     }
 }
+
 
 static ssize_t k3dh_store_enable(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -1755,7 +1768,7 @@ static void k3dh_acc_input_cleanup(struct k3dh_acc_data *acc)
   	input_free_device(acc->input_dev);
 }
 
-#ifndef CONFIG_LGE_SENSOR_FUSION
+//#ifndef CONFIG_LGE_SENSOR_FUSION
 
 static int k3dh_regs_update(struct k3dh_acc_data *acc, u8 reg_addr, int res_addr, u8 value)
 {
@@ -2052,46 +2065,33 @@ static void k3dh_flip_input_cleanup(struct k3dh_acc_data *acc)
   	input_unregister_device(acc->input_dev_flip);
   	input_free_device(acc->input_dev_flip);
 }
-#endif //CONFIG_LGE_SENSOR_FUSION
+//#endif //CONFIG_LGE_SENSOR_FUSION
 
 static ssize_t k3dh_show_report_cnt(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	printk(KERN_INFO "%s: report_cnt: %d\n", __func__, report_cnt);
+	//printk(KERN_INFO "%s: report_cnt: %d\n", __func__, report_cnt);
 
-	if(k3dh_acc_misc_data->enable & ena_mask[ID_ACC])
+	//if(k3dh_acc_misc_data->enable & ena_mask[ID_ACC])
 		return sprintf(buf, "%d\n", report_cnt);
-	else
-		return sprintf(buf, "%d\n", -1);
+	//else
+	//	return sprintf(buf, "%d\n", -1);
+}
+static ssize_t k3dh_x_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+//	return sprintf(buf, "%d\n", k3dh_xyz[0]);
+	return sprintf(buf, "%d\n", acc_xyz[0]);
 }
 
-static ssize_t k3dh_show_x(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t k3dh_y_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	printk(KERN_INFO "%s: x: %d\n", __func__, k3dh_xyz[0]);
-
-	if(k3dh_acc_misc_data->enable & ena_mask[ID_ACC])
-		return sprintf(buf, "%d\n", k3dh_xyz[0]);
-	else
-		return sprintf(buf, "%d\n", -1);
+//	return sprintf(buf, "%d\n", k3dh_xyz[1]);
+	return sprintf(buf, "%d\n", acc_xyz[1]);
 }
 
-static ssize_t k3dh_show_y(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t k3dh_z_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	printk(KERN_INFO "%s: y: %d\n", __func__, k3dh_xyz[1]);
-
-	if(k3dh_acc_misc_data->enable & ena_mask[ID_ACC])
-		return sprintf(buf, "%d\n", k3dh_xyz[1]);
-	else
-		return sprintf(buf, "%d\n", -1);
-}
-
-static ssize_t k3dh_show_z(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	printk(KERN_INFO "%s: z: %d\n", __func__, k3dh_xyz[2]);
-
-	if(k3dh_acc_misc_data->enable & ena_mask[ID_ACC])
-		return sprintf(buf, "%d\n", k3dh_xyz[2]);
-	else
-		return sprintf(buf, "%d\n", -1);
+//	return sprintf(buf, "%d\n", k3dh_xyz[2]);
+	return sprintf(buf, "%d\n", acc_xyz[2]);
 }
 
 #ifdef K3DH_USER_CALIBRATION
@@ -2112,6 +2112,7 @@ static ssize_t k3dh_store_calibration(struct device *dev, struct device_attribut
 	if(DEBUG_SYSFS_INFO & debug_mask)
 		printk(KERN_INFO "%s write to calibration %s\n", K3DH_ACC_DEV_NAME, buf);
 	
+
 	if (sysfs_streq(buf, "1"))
 	{
 		calibration_status = 1;
@@ -2141,28 +2142,29 @@ static ssize_t k3dh_store_calibration(struct device *dev, struct device_attribut
 		calibration_status = 9;
 	}
 		
-	
 	return count;
 }
 
 static DEVICE_ATTR(calibration, S_IRUGO|S_IWUSR, k3dh_show_calibration, k3dh_store_calibration);
 #endif
-
 static DEVICE_ATTR(acc_cal, S_IRUGO|S_IWUSR, k3dh_show_calibration, k3dh_store_calibration);
 static DEVICE_ATTR(cnt, S_IRUGO, k3dh_show_report_cnt, NULL);
-static DEVICE_ATTR(x, S_IRUGO, k3dh_show_x, NULL);
-static DEVICE_ATTR(y, S_IRUGO, k3dh_show_y, NULL);
-static DEVICE_ATTR(z, S_IRUGO, k3dh_show_z, NULL);
+static DEVICE_ATTR(x, S_IRUGO, k3dh_x_show, NULL);
+static DEVICE_ATTR(y, S_IRUGO, k3dh_y_show, NULL);
+static DEVICE_ATTR(z, S_IRUGO, k3dh_z_show, NULL);
+
 static struct attribute *k3dh_attributes[] = 
 {
+	
   	&dev_attr_enable.attr,
   	&dev_attr_poll_delay.attr,
 	&dev_attr_acc_cal.attr,
 	&dev_attr_cnt.attr,
-  	&dev_attr_x.attr,
+	&dev_attr_x.attr,
   	&dev_attr_y.attr,
   	&dev_attr_z.attr,
-	NULL,
+  	NULL,
+  	
 };
 static const struct attribute_group k3dh_attr_group = 
 {
@@ -2410,7 +2412,7 @@ static int k3dh_acc_probe(struct i2c_client *client,const struct i2c_device_id *
     	goto err_power_off;
   	}
 
-#ifndef CONFIG_LGE_SENSOR_FUSION
+//#ifndef CONFIG_LGE_SENSOR_FUSION
   	err = k3dh_tap_input_init(acc);
   	if (err < 0) 
   	{
@@ -2424,7 +2426,7 @@ static int k3dh_acc_probe(struct i2c_client *client,const struct i2c_device_id *
     	dev_err(&client->dev, "input(flip) init failed\n");
 	   goto err_input_cleanup2;
   	}
-#endif  
+//#endif  
   	k3dh_acc_misc_data = acc;
 
   	err = misc_register(&k3dh_acc_misc_device);
@@ -2501,12 +2503,12 @@ err_misc_dereg:
   	misc_deregister(&k3dh_acc_misc_device);
 err_input_cleanup:
   	k3dh_acc_input_cleanup(acc);
-#ifndef CONFIG_LGE_SENSOR_FUSION	
+//#ifndef CONFIG_LGE_SENSOR_FUSION	
 err_input_cleanup1:
   	k3dh_tap_input_cleanup(acc);
 err_input_cleanup2:
   	k3dh_flip_input_cleanup(acc);
-#endif
+//#endif
 err_power_off:
   	k3dh_acc_device_power_off(acc);
 err2:
@@ -2531,6 +2533,15 @@ exit:
   	return err;
 }
 
+//seungkwan.jung
+void k3dh_shutdown(struct i2c_client *client){
+
+	struct k3dh_acc_data *acc = i2c_get_clientdata(client);
+
+	printk("  k3dh_shutdown !  ");
+	k3dh_acc_disable(acc,ID_ACC);
+
+}
 static int __devexit k3dh_acc_remove(struct i2c_client *client)
 {
   /* TODO: revisit ordering here once _probe order is finalized */
@@ -2540,7 +2551,6 @@ static int __devexit k3dh_acc_remove(struct i2c_client *client)
   //device_remove_file(&client->dev, &dev_attr_y);
   //device_remove_file(&client->dev, &dev_attr_z);
   //device_remove_file(&client->dev, &dev_attr_enable);
-
   device_remove_file(&k3dh_acc_misc_data->input_dev->dev, &dev_attr_acc_cal);
   device_remove_file(&k3dh_acc_misc_data->input_dev->dev, &dev_attr_cnt);  
   device_remove_file(&k3dh_acc_misc_data->input_dev->dev, &dev_attr_x);
@@ -2662,6 +2672,8 @@ static struct i2c_driver k3dh_acc_driver = {
   .driver = {
     .name = K3DH_ACC_DEV_NAME,
   },
+  //seungkwan.jung
+  .shutdown =k3dh_shutdown,
   .probe = k3dh_acc_probe,
   .remove = __devexit_p(k3dh_acc_remove),
 #ifndef CONFIG_HAS_EARLYSUSPEND

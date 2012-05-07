@@ -77,7 +77,6 @@ obj-$(CONFIG_USB_ANDROID_MASS_STORAGE)	+= f_mass_storage.o
 obj-$(CONFIG_USB_ANDROID_MTP)	+= f_mtp.o
 obj-$(CONFIG_USB_ANDROID_RNDIS)	+= f_rndis.o u_ether.o
 obj-$(CONFIG_LGE_USB_GADGET_DRIVER)	+= f_ecm.o u_ether.o
-obj-$(CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN)	+= f_auto_run.o
 
 # MSM specific
 obj-$(CONFIG_USB_ANDROID_DIAG)	+= f_diag.o

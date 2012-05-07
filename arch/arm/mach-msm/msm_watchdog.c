@@ -282,6 +282,8 @@ static int __init init_watchdog(void)
 
 			ret = scm_call(SCM_SVC_UTIL, SCM_SET_REGSAVE_CMD,
 				       &cmd_buf, sizeof(cmd_buf), NULL, 0);
+			printk("init_watchdog  regsave = %d\n",(int)regsave);
+			
 			if (ret)
 				pr_err("Setting register save address failed.\n"
 				       "Registers won't be dumped on a dog "

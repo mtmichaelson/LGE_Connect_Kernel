@@ -202,10 +202,7 @@ enum {
 
 #ifdef CONFIG_LGE_PMIC8058_MPP
 #define CHANNEL_ADC_PCB_REVISION 0x20
-#if !defined (CONFIG_LGE_MACH_BOARD_REVA)
 #define CHANNEL_ADC_ACC			0x21
-#define CHANNEL_ADC_WIRELESS_CURRENT	0x22
-#endif
 #endif
 
 enum {

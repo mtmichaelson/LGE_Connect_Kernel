@@ -148,7 +148,7 @@ NORET_TYPE void panic(const char * fmt, ...)
 	set_crash_store_enable();
 #endif
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
-	printk(KERN_EMERG "Kernel Version: %s", linux_banner);
+	//printk(KERN_EMERG "Kernel Version: %s", linux_banner);
  
 /* [ULS] Display MDM Crash : start - yocheol.kim@lge.com - 20110725 */
 #ifdef CONFIG_LGE_SDIO_DEBUG_CH
@@ -158,15 +158,15 @@ if (uls_the_kind_of_subsys > ULS_NO_SUBSYSTEM)
 	// err fatal was occured
 	if(uls_mdm_crash_fatal_flag == true)	// uls_the_kind_of_subsys == ULS_SUBSYSTEM_MDM
 	{
-		printk(KERN_EMERG "\n\nCheck MP side operation (9k_modem)(%d)(%d)!!\n", 
+		printk(KERN_EMERG "\nCheck MP side operation (9k_modem)(%d)(%d)\n", 
 								uls_mdm_crash_fatal_flag, 
 								uls_mdm_status_low_flag); 
 		
 		if(g_uls_rx_data.valid == true)
 		{
-		printk(KERN_EMERG "\n\nMDM CRASH!!!\n");
-		printk(KERN_EMERG "ULS_CRASH_POINT: %s  line : %d\n", g_uls_rx_data.rx_data.filename, g_uls_rx_data.rx_data.line);
-		printk(KERN_EMERG "ULS_CRASH_MSG: %s \n", g_uls_rx_data.rx_data.msg);
+		//printk(KERN_EMERG "\n\nMDM CRASH!!!\n");
+		printk(KERN_EMERG "CRASH_POINT: %s  line : %d\n", g_uls_rx_data.rx_data.filename, g_uls_rx_data.rx_data.line);
+		printk(KERN_EMERG "CRASH_MSG: %s \n", g_uls_rx_data.rx_data.msg);
 		printk(KERN_EMERG "SW_VERSION : %s \n", g_uls_rx_data.rx_data.sw_ver); //[ULS] for s/w ver display < wj1208.jo@lge.com >
 		}
 		else 
@@ -189,15 +189,15 @@ if (uls_the_kind_of_subsys > ULS_NO_SUBSYSTEM)
 		else {
 			if (uls_mdm_status_low_flag == true)
 			{
-				printk(KERN_EMERG "\n\nCheck MDM side operation(%d)(%d)!!\n", 
+				printk(KERN_EMERG "\nCheck MDM side operation(%d)(%d)!!\n", 
 										uls_mdm_crash_fatal_flag, 
 										uls_mdm_status_low_flag);
 
 				if(g_uls_rx_data.valid == true)
 				{
-				printk(KERN_EMERG "\n\nMDM CRASH!!!\n");
-				printk(KERN_EMERG "ULS_CRASH_POINT: %s  line : %d\n", g_uls_rx_data.rx_data.filename, g_uls_rx_data.rx_data.line);
-				printk(KERN_EMERG "ULS_CRASH_MSG: %s \n", g_uls_rx_data.rx_data.msg);
+				//printk(KERN_EMERG "\n\nMDM CRASH!!!\n");
+				printk(KERN_EMERG "CRASH_POINT: %s  line : %d\n", g_uls_rx_data.rx_data.filename, g_uls_rx_data.rx_data.line);
+				printk(KERN_EMERG "CRASH_MSG: %s \n", g_uls_rx_data.rx_data.msg);
 				printk(KERN_EMERG "SW_VERSION : %s \n", g_uls_rx_data.rx_data.sw_ver); //[ULS] for s/w ver display < wj1208.jo@lge.com >
 				}
 			}

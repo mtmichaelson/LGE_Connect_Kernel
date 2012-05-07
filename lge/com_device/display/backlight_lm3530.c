@@ -27,17 +27,14 @@
 #include <mach/board.h>
 
 #include <mach/board_lge.h>
-#define MAX_LEVEL			0x71 
-#define MIN_LEVEL 		0x0F
-#define DEFAULT_LEVEL	0x33
-
+#define MAX_BRIGHTNESS 			0x71//20mA , shoogi.lee@lge.com, 2011_04_20
+#define DEFAULT_BRIGHTNESS 		0x33//220nit, shoogi.lee@lge.com, 2011_04_20
 #define I2C_BL_NAME "lm3530"
 
 #define BL_ON	1
 #define BL_OFF	0
 
 #ifdef CONFIG_LGE_PM_FACTORY_CURRENT_DOWN
-extern uint16_t battery_info_get(void);
 __attribute__((weak)) int usb_cable_info;
 #endif
 
@@ -50,19 +47,22 @@ struct backlight_platform_data {
    int max_current;
    int init_on_boot;
    int min_brightness;
-
+//start, linear mode, shoogi.lee@lge.com, 2011_04_20
+   int default_brightness;
    int max_brightness;
- 
+//end, linear mode, shoogi.lee@lge.com, 2011_04_20   
 };
 
 struct lm3530_device {
 	struct i2c_client *client;
 	struct backlight_device *bl_dev;
 	int gpio;
-   int max_current;
-   int min_brightness;
-   int max_brightness;
-
+	int max_current;
+	int min_brightness;
+//start, linear mode, shoogi.lee@lge.com, 2011_04_20
+	int default_brightness;
+	int max_brightness;
+//end, linear mode, shoogi.lee@lge.com, 2011_04_20 
 	struct mutex bl_mutex;
 };
 
@@ -73,8 +73,8 @@ static const struct i2c_device_id lm3530_bl_id[] = {
 
 static int lm3530_write_reg(struct i2c_client *client, unsigned char reg, unsigned char val);
 
-static int cur_main_lcd_level;
-static int saved_main_lcd_level;
+static int cur_main_lcd_level = DEFAULT_BRIGHTNESS;
+static int saved_main_lcd_level = DEFAULT_BRIGHTNESS;
 
 static int backlight_status = BL_OFF;
 static struct lm3530_device *main_lm3530_dev = NULL;
@@ -115,16 +115,18 @@ static void lm3530_set_main_current_level(struct i2c_client *client, int level)
 	
 	int min_brightness = main_lm3530_dev->min_brightness;
 	int max_current = main_lm3530_dev->max_current;
+	int default_brightness=main_lm3530_dev->default_brightness;
    	int max_brightness=main_lm3530_dev->max_brightness;
 
    dev = (struct lm3530_device *)i2c_get_clientdata(client);
-	dev->bl_dev->props.brightness = cur_main_lcd_level = level;
+	cur_main_lcd_level = level; 
+	dev->bl_dev->props.brightness = cur_main_lcd_level;
 
 	mutex_lock(&main_lm3530_dev->bl_mutex);
 
 	if(level!= 0){
 		if(lge_bd_rev == LGE_REV_A) {
-			cal_value = 0x7F - ( (MAX_LEVEL - level) * 2);
+			cal_value = 0x7F - ( (MAX_BRIGHTNESS - level) * 2);
 			lm3530_write_reg(client, 0x10, 0x11);	// device enable with 19mA full scale.
 			lm3530_write_reg(client, 0xA0, cal_value);
 		}
@@ -154,22 +156,52 @@ static void lm3530_set_main_current_level(struct i2c_client *client, int level)
 			lm3530_write_reg(client, 0x10, 0x11);	// device enable with 19mA full scale.
 			lm3530_write_reg(client, 0xA0, cal_value);
 		}
-		else if(lge_bd_rev >= LGE_REV_C) {			
-if (level <= MIN_LEVEL)
-                  cal_value = min_brightness;
-else if(level > MIN_LEVEL && level <= MAX_LEVEL) 
-          cal_value =(max_brightness- min_brightness)*level/(MAX_LEVEL- MIN_LEVEL)
-		   				-((max_brightness- min_brightness)*MIN_LEVEL/(MAX_LEVEL- MIN_LEVEL)-min_brightness);
-						
-else if(level >MAX_LEVEL)
-           cal_value = max_brightness;
-			
+		else if(lge_bd_rev >= LGE_REV_C) {		
+			// ACL + default setting
+			if(level < 26)
+				cal_value = min_brightness;
+			else if(level >= 26 && level < 32)
+				cal_value = 0x10;
+			else if(level >= 32 && level < 39)
+				cal_value = 0x16;
+			else if(level >= 39 && level < 46)
+				cal_value = 0x1E;
+			else if(level >= 46 && level < 51)
+				cal_value = 0x28;
+			else if(level >= 51 && level < 54)
+				cal_value = 0x31;
+			else if(level >= 54 && level < 56)
+				cal_value = 0x35;
+			else if(level >= 56 && level < 64)
+				cal_value = 0x38;
+			else if(level == 64)
+				cal_value = 0x40;
+			else if(level >64)
+				cal_value = (level - 51) * (max_brightness - default_brightness) / (113 - 51) + default_brightness;
+
+			if(cal_value > max_brightness)
+				cal_value = max_brightness;
+
 #ifdef CONFIG_LGE_PM_FACTORY_CURRENT_DOWN
-			if((0 == battery_info_get())&&((usb_cable_info == 6) ||(usb_cable_info == 7)||(usb_cable_info == 11)))
+			if((usb_cable_info == 6) ||(usb_cable_info == 7)||(usb_cable_info == 11))
 			{
 				cal_value = min_brightness;
 			}
-#endif			
+#endif
+			/*
+			if (level <= 15)
+			{
+				cal_value = min_brightness;
+			}
+			else if(level > 15 && level <= 51) //level = UI value/ 2, default UI level =102
+			{
+				cal_value = (level - 15) * (default_brightness - min_brightness) / (51 - 15) + min_brightness;
+			}
+			else if(level >51)
+			{
+				cal_value = (level - 51) * (max_brightness - default_brightness) / (127 - 51) + default_brightness;
+			}
+			*/
 			
 			lm3530_write_reg(client, 0x10, max_current);
 			lm3530_write_reg(client, 0xA0, cal_value);
@@ -178,7 +210,8 @@ else if(level >MAX_LEVEL)
 			//printk("%s() :level is : %d, cal_value is : 0x%x\n", __func__, level, cal_value);
 		}
 	}
-	else{		
+	else{
+		
 		lm3530_write_reg(client, 0x10, 0x00);
 	}
 
@@ -190,16 +223,9 @@ else if(level >MAX_LEVEL)
 void lm3530_backlight_on(int level)
 {
 	//printk("%s received (prev backlight_status: %s)\n", __func__, backlight_status?"ON":"OFF");
-	if(backlight_status == BL_OFF) {
-		lm3530_hw_reset();
-		lm3530_set_main_current_level(main_lm3530_dev->client, level);
-		backlight_status = BL_ON;
-
-		msleep(10);
-	} else {
-		lm3530_set_main_current_level(main_lm3530_dev->client, level);
-		backlight_status = BL_ON;
-	}
+	lm3530_hw_reset();
+	lm3530_set_main_current_level(main_lm3530_dev->client, level);
+	backlight_status = BL_ON;
 
 	return;
 }
@@ -222,8 +248,8 @@ void lm3530_backlight_off(void)
 
 void lm3530_lcd_backlight_set_level( int level)
 {
-	if (level > MAX_LEVEL)
-		level = MAX_LEVEL;
+	if (level > MAX_BRIGHTNESS)
+		level = MAX_BRIGHTNESS;
 
 	if(lm3530_i2c_client!=NULL )
 	{		
@@ -245,17 +271,17 @@ static int bl_set_intensity(struct backlight_device *bd)
 	
 	struct i2c_client *client = to_i2c_client(bd->dev.parent);
 
-	if(backlight_status == BL_ON) {
-		lm3530_set_main_current_level(client, bd->props.brightness);
-		cur_main_lcd_level = bd->props.brightness; 
-	}
+	lm3530_set_main_current_level(client, bd->props.brightness);
+	cur_main_lcd_level = bd->props.brightness; 
 	
 	return 0;
 }
 
 static int bl_get_intensity(struct backlight_device *bd)
 {
-    return cur_main_lcd_level;
+    unsigned char val=0;
+	 val &= 0x1f;
+    return (int)val;
 }
 
 static ssize_t lcd_backlight_show_level(struct device *dev, struct device_attribute *attr, char *buf)
@@ -277,6 +303,8 @@ static ssize_t lcd_backlight_store_level(struct device *dev, struct device_attri
 	
 	level = simple_strtoul(buf, NULL, 10);
 	
+	if (level > MAX_BRIGHTNESS)
+		level = MAX_BRIGHTNESS;
 
 	lm3530_set_main_current_level(client, level);
 	cur_main_lcd_level = level; 
@@ -302,8 +330,11 @@ static int lm3530_bl_suspend(struct i2c_client *client, pm_message_t state)
 
 static ssize_t lcd_backlight_show_on_off(struct device *dev, struct device_attribute *attr, char *buf)
 {
+	int r = 0;
+
 	printk("%s received (prev backlight_status: %s)\n", __func__, backlight_status?"ON":"OFF");
-	return 0;
+
+	return r;
 }
 
 static ssize_t lcd_backlight_store_on_off(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
@@ -358,11 +389,11 @@ static int lm3530_probe(struct i2c_client *i2c_dev, const struct i2c_device_id *
 	main_lm3530_dev = dev;
 
 	memset(&props, 0, sizeof(struct backlight_properties));
-	props.max_brightness = MAX_LEVEL;
+	props.max_brightness = MAX_BRIGHTNESS;
 	
 	bl_dev = backlight_device_register(I2C_BL_NAME, &i2c_dev->dev, NULL, &lm3530_bl_ops, &props);
-	bl_dev->props.max_brightness = MAX_LEVEL;
-	bl_dev->props.brightness = DEFAULT_LEVEL;
+	bl_dev->props.max_brightness = MAX_BRIGHTNESS;
+	bl_dev->props.brightness = DEFAULT_BRIGHTNESS;
 	bl_dev->props.power = FB_BLANK_UNBLANK;
 	
 	dev->bl_dev = bl_dev;
@@ -370,7 +401,10 @@ static int lm3530_probe(struct i2c_client *i2c_dev, const struct i2c_device_id *
 	dev->gpio = pdata->gpio;
 	dev->max_current = pdata->max_current;
 	dev->min_brightness = pdata->min_brightness;
+	//start, linear mode, shoogi.lee@lge.com, 2011_04_20
+	dev->default_brightness = pdata->default_brightness;
 	dev->max_brightness = pdata->max_brightness;
+	//end, linear mode, shoogi.lee@lge.com, 2011_04_20
 	i2c_set_clientdata(i2c_dev, dev);
 
 	if(dev->gpio && gpio_request(dev->gpio, "lm3530 reset") != 0) {
@@ -379,6 +413,11 @@ static int lm3530_probe(struct i2c_client *i2c_dev, const struct i2c_device_id *
 
 	mutex_init(&dev->bl_mutex);
 
+#ifdef CONFIG_LGE_BOOTLOADER_DISP_INIT
+#else
+	lm3530_hw_reset();
+	lm3530_backlight_on(DEFAULT_BRIGHTNESS);
+#endif
 
 	err = device_create_file(&i2c_dev->dev, &dev_attr_lm3530_level);
 	err = device_create_file(&i2c_dev->dev, &dev_attr_lm3530_backlight_on_off);

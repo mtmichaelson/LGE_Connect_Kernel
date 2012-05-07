@@ -116,24 +116,22 @@
 #define AUTO_CHARGING_FAST_TIME_MAX_MINUTES		512
 #define AUTO_CHARGING_TRICKLE_TIME_MINUTES		30
 #ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-#define AUTO_CHARGING_VEOC_ITERM			160
+#define AUTO_CHARGING_VEOC_ITERM			100 //160 in case of VS920
 #else
 #define AUTO_CHARGING_VEOC_ITERM			100
 #endif
 #define AUTO_CHARGING_IEOC_ITERM			160
 
 #ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-#define AUTO_CHARGING_RESUME_MV_CALC(x) (4250-(x*150))
-#define AUTO_CHARGING_RESUME_MV				4250
+#define AUTO_CHARGING_RESUME_MV				4120
 #else
 #define AUTO_CHARGING_RESUME_MV				4100
 #endif
 
 #ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-#define AUTO_CHARGING_VBATDET				4300
-//FIXME 3160_conflict AUTO_CHARGING_VBATDET_DEBOUNCE_TIME_MS is added in 3160 CS version
+#define AUTO_CHARGING_VBATDET				4170
 #define AUTO_CHARGING_VBATDET_DEBOUNCE_TIME_MS		3000
-#define AUTO_CHARGING_VEOC_VBATDET			4250
+#define AUTO_CHARGING_VEOC_VBATDET			4120
 #else
 #define AUTO_CHARGING_VBATDET				4150
 #define AUTO_CHARGING_VBATDET_DEBOUNCE_TIME_MS		3000
@@ -156,13 +154,6 @@
 #define PM8058_CHG_V_STEP_MV 25
 #define PM8058_CHG_V_MIN_MV  2400
 
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-#define AUTO_CHARGING_VMAXSEL_CALC(x) (4350-(x*150))
-#define AUTO_CHARGING_VBATDET_CALC(x) (4300-(x*150))
-#define AUTO_CHARGING_VEOC_VBATDET_CALC(x) (4250-(x*150))
-#define AUTO_CHARGING_RESUME_MV_CALC(x) (4250-(x*150))
-#endif
-
 #ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
 #define BATT_UNKNOWN    0
 #define BATT_DS2704_N   17
@@ -174,7 +165,7 @@
 #define BATT_ID_MIN_MV  600
 #endif
 
-#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
+#if 1//def CONFIG_LGE_PM_BATTERY_ID_CHECKER
 extern uint16_t battery_info_get(void);
 #endif
 
@@ -272,12 +263,7 @@ static struct notifier_block alarm_notifier = {
 	.notifier_call = msm_battery_gague_alarm_notify,
 };
 
-//Temp compile err blocking
-//#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-//static int resume_mv = AUTO_CHARGING_RESUME_MV_CALC(lge_battery_info);
-//#else
 static int resume_mv = AUTO_CHARGING_RESUME_MV;
-//#endif
 static DEFINE_MUTEX(batt_alarm_lock);
 static int resume_mv_set(const char *val, struct kernel_param *kp);
 module_param_call(resume_mv, resume_mv_set, param_get_int,
@@ -297,7 +283,7 @@ static int resume_mv_set(const char *val, struct kernel_param *kp)
 	if (is_chg_plugged_in())
 #endif
 #ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-	rc = pm8058_batt_alarm_threshold_set(AUTO_CHARGING_RESUME_MV_CALC(lge_battery_info), (4350-(lge_battery_info*150)) );
+	rc = pm8058_batt_alarm_threshold_set(resume_mv, 4200);
 #else
 	rc = pm8058_batt_alarm_threshold_set(resume_mv, 4300);
 #endif
@@ -815,20 +801,6 @@ static int __pm8058_start_charging(int chg_current, int termination_current,
 #ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
 /* kiwone.seo@lge.com, we must enable batt temp monitoring. because the interrupt never be occured 
 and must change register value in HW. */
-#if defined(CONFIG_MACH_LGE_I_BOARD_VZW)
-	if((lge_bd_rev == 2 ) ||(lge_bd_rev == 3 )) // rev.A, rev.B
-		pm_chg_batt_temp_disable(1);
-	else
-		pm_chg_batt_temp_disable(0);
-#elif defined(CONFIG_MACH_LGE_I_BOARD_LGU)
-	if(lge_bd_rev > 2 ) // more than rev.B
-		pm_chg_batt_temp_disable(0);
-	else
-		pm_chg_batt_temp_disable(1);
-#else
-	pm_chg_batt_temp_disable(1);
-#endif
-#else
 	ret = pm_chg_batt_temp_disable(0);
 #endif 
 	if (ret)
@@ -908,7 +880,7 @@ static void charging_check_work(struct work_struct *work)
 		break;
 	default:
 		/* Still not charging, so update driver state */
-		chg_done_cleanup();
+//		chg_done_cleanup();
 		break;
 	};
 }
@@ -939,19 +911,11 @@ static int pm8058_start_charging(struct msm_hardware_charger *hw_chg,
 		goto out;
 
 	/* set vbat to  CC to CV threshold */
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-	ret = pm_chg_vbatdet_set(AUTO_CHARGING_VBATDET_CALC(lge_battery_info));
-#else
 	ret = pm_chg_vbatdet_set(AUTO_CHARGING_VBATDET);
-#endif
 	if (ret)
 		goto out;
 
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-	pm8058_chg.vbatdet = AUTO_CHARGING_VBATDET_CALC(lge_battery_info);
-#else
 	pm8058_chg.vbatdet = AUTO_CHARGING_VBATDET;
-#endif
 	/*
 	 * get the state of vbat and if it is higher than
 	 * AUTO_CHARGING_VBATDET we start the veoc start timer
@@ -1013,19 +977,12 @@ int pm8058_start_charging_for_ATCMD(void)
 		goto out;
 
 	/* set vbat to  CC to CV threshold */
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-	ret = pm_chg_vbatdet_set(AUTO_CHARGING_VBATDET_CALC(lge_battery_info));
-#else
 	ret = pm_chg_vbatdet_set(AUTO_CHARGING_VBATDET);
-#endif
+
 	if (ret)
 		goto out;
 
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-	pm8058_chg.vbatdet = AUTO_CHARGING_VBATDET_CALC(lge_battery_info);
-#else
 	pm8058_chg.vbatdet = AUTO_CHARGING_VBATDET;
-#endif
 	/*
 	 * get the state of vbat and if it is higher than
 	 * AUTO_CHARGING_VBATDET we start the veoc start timer
@@ -1055,6 +1012,63 @@ out:
 }
 
 EXPORT_SYMBOL(pm8058_start_charging_for_ATCMD);
+
+int pm8058_start_charging_for_TESTMODE(void)
+{
+	int vbat_higher_than_vbatdet;
+	int ret = 0;
+  int chg_current = 0;
+
+	/*
+	 * adjust the max current for PC USB connection - set the higher limit
+	 * to 450 and make sure we never cross it
+	 */
+  chg_current = 800;
+
+	pm8058_chg.current_charger_current = chg_current;
+	pm8058_chg_enable_irq(FASTCHG_IRQ);
+
+	ret = pm_chg_vmaxsel_set(4200);
+	if (ret)
+		goto out;
+
+	/* set vbat to  CC to CV threshold */
+	ret = pm_chg_vbatdet_set(AUTO_CHARGING_VBATDET);
+
+	if (ret)
+		goto out;
+
+	pm8058_chg.vbatdet = AUTO_CHARGING_VBATDET;
+	/*
+	 * get the state of vbat and if it is higher than
+	 * AUTO_CHARGING_VBATDET we start the veoc start timer
+	 * else wait for the voltage to go to AUTO_CHARGING_VBATDET
+	 * and then start the 90 min timer
+	 */
+	vbat_higher_than_vbatdet =
+	    pm_chg_get_rt_status(pm8058_chg.pmic_chg_irq[VBATDET_IRQ]);
+	if (vbat_higher_than_vbatdet) {
+		/*
+		 * we are in constant voltage phase of charging
+		 * IEOC should happen withing 90 mins of this instant
+		 * else we enable VEOC
+		 */
+		dev_info(pm8058_chg.dev, "%s begin veoc timer\n", __func__);
+		schedule_delayed_work(&pm8058_chg.veoc_begin_work,
+				      round_jiffies_relative(msecs_to_jiffies
+				     (AUTO_CHARGING_VEOC_BEGIN_TIME_MS)));
+	} else
+		pm8058_chg_enable_irq(VBATDET_IRQ);
+
+	ret = __pm8058_start_charging(chg_current, AUTO_CHARGING_IEOC_ITERM,
+				AUTO_CHARGING_FAST_TIME_MAX_MINUTES);
+	pm8058_chg.current_charger_current = chg_current;
+out:
+	return ret;
+}
+
+EXPORT_SYMBOL(pm8058_start_charging_for_TESTMODE);
+
 #endif
 
 
@@ -1221,13 +1235,8 @@ static irqreturn_t pm8058_chg_auto_chgfail_handler(int irq, void *dev_id)
 		/* note we are waiting on veoc */
 		pm8058_chg.waiting_for_veoc = 1;
 
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-		pm_chg_vbatdet_set(AUTO_CHARGING_VEOC_VBATDET_CALC(lge_battery_info));
-		pm8058_chg.vbatdet = AUTO_CHARGING_VEOC_VBATDET_CALC(lge_battery_info);
-#else
 		pm_chg_vbatdet_set(AUTO_CHARGING_VEOC_VBATDET);
 		pm8058_chg.vbatdet = AUTO_CHARGING_VEOC_VBATDET;
-#endif
 		pm8058_chg_enable_irq(VBATDET_LOW_IRQ);
 	}
 	return IRQ_HANDLED;
@@ -1290,11 +1299,7 @@ static irqreturn_t pm8058_chg_vbatdet_handler(int irq, void *dev_id)
 	ret = pm_chg_get_rt_status(pm8058_chg.pmic_chg_irq[VBATDET_IRQ]);
 
 	if (ret) {
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-		if (pm8058_chg.vbatdet == AUTO_CHARGING_VBATDET_CALC(lge_battery_info)
-#else
 		if (pm8058_chg.vbatdet == AUTO_CHARGING_VBATDET
-#endif
 			&& !delayed_work_pending(&pm8058_chg.veoc_begin_work)) {
 			/*
 			 * we are in constant voltage phase of charging
@@ -1309,11 +1314,8 @@ static irqreturn_t pm8058_chg_vbatdet_handler(int irq, void *dev_id)
 				      (AUTO_CHARGING_VEOC_BEGIN_TIME_MS)));
 		}
 	} else {
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-		if (pm8058_chg.vbatdet == AUTO_CHARGING_VEOC_VBATDET_CALC(lge_battery_info)) {
-#else
 		if (pm8058_chg.vbatdet == AUTO_CHARGING_VEOC_VBATDET) {
-#endif
+
 			cancel_delayed_work_sync(
 				&pm8058_chg.check_vbat_low_work);
 
@@ -1357,10 +1359,7 @@ static irqreturn_t pm8058_chg_batt_replace_handler(int irq, void *dev_id)
 }
 
 #ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
-extern void arch_reset(char mode, const char *cmd);
-#endif
-#ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
-extern acc_cable_type get_ext_cable_type_value(void);
+extern void msm_power_off(void);
 #endif
 static irqreturn_t pm8058_chg_battconnect_handler(int irq, void *dev_id)
 {
@@ -1374,17 +1373,7 @@ static irqreturn_t pm8058_chg_battconnect_handler(int irq, void *dev_id)
 		pm8058_chg_enable_irq(BATTTEMP_IRQ);
 	}
 #ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
-/* kiwone.seo@lge.com 2011-05-26, we will always restart whenever battery is inserted or removed */
-		pr_err("===========================================================");
-        if(TA_CABLE_800MA == get_ext_cable_type_value() || MHL_CABLE_500MA == get_ext_cable_type_value()
-			|| TA_CABLE_600MA == get_ext_cable_type_value() || TA_CABLE_DTC_800MA == get_ext_cable_type_value()
-			|| TA_CABLE_FORGED_500MA == get_ext_cable_type_value()
-			)
-        {
-			pr_err("%s: arch_reset board rev = %d \n",__func__, lge_bd_rev);
-			pr_err("===========================================================");
-			arch_reset(0,NULL);
-        }
+			msm_power_off();
 #endif
 	return IRQ_HANDLED;
 }
@@ -1775,6 +1764,52 @@ int pm8058_stop_charging_for_ATCMD(void)
 }
 
 EXPORT_SYMBOL(pm8058_stop_charging_for_ATCMD);
+
+int pm8058_stop_charging_for_TESTMODE(void)
+{
+	int ret;
+
+	dev_info(pm8058_chg.dev, "%s stopping charging\n", __func__);
+	cancel_delayed_work_sync(&pm8058_chg.veoc_begin_work);
+	cancel_delayed_work_sync(&pm8058_chg.check_vbat_low_work);
+	cancel_delayed_work_sync(&pm8058_chg.chg_done_check_work);
+
+	ret = pm_chg_get_rt_status(pm8058_chg.pmic_chg_irq[FASTCHG_IRQ]);
+	if (ret == 1)
+		pm_chg_suspend(1);
+	else
+		dev_err(pm8058_chg.dev,
+			"%s called when not fast-charging\n", __func__);
+
+	pm_chg_failed_clear(1);
+
+	pm8058_chg.waiting_for_veoc = 0;
+	pm8058_chg.waiting_for_topoff = 0;
+
+
+	/* disable the irqs enabled while charging */
+	pm8058_chg_disable_irq(AUTO_CHGFAIL_IRQ);
+	pm8058_chg_disable_irq(CHGHOT_IRQ);
+	pm8058_chg_disable_irq(AUTO_CHGDONE_IRQ);
+	pm8058_chg_disable_irq(FASTCHG_IRQ);
+	pm8058_chg_disable_irq(CHG_END_IRQ);
+	pm8058_chg_disable_irq(VBATDET_IRQ);
+	pm8058_chg_disable_irq(VBATDET_LOW_IRQ);
+	if (pm8058_chg.voter)
+		msm_xo_mode_vote(pm8058_chg.voter, MSM_XO_MODE_OFF);
+
+  if (!delayed_work_pending(&pm8058_chg.chg_done_check_work)) 
+  {
+		schedule_delayed_work(&pm8058_chg.chg_done_check_work,
+				      round_jiffies_relative(msecs_to_jiffies
+			     (100)));
+  }
+
+	return 0;
+}
+
+EXPORT_SYMBOL(pm8058_stop_charging_for_TESTMODE);
+
 #endif
 
 
@@ -1789,13 +1824,9 @@ static int set_status(void *data, u64 val)
 
 	pm8058_chg.current_charger_current = val;
 	if (pm8058_chg.current_charger_current)
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-		pm8058_start_charging(NULL, AUTO_CHARGING_VMAXSEL_CALC(lge_battery_info), pm8058_chg.current_charger_current);
-#else
 		pm8058_start_charging(NULL,
 			AUTO_CHARGING_VMAXSEL,
 			pm8058_chg.current_charger_current);
-#endif
 	else
 		pm8058_stop_charging(NULL);
 	return 0;
@@ -2139,40 +2170,24 @@ sanity_out:
 static int pm8058_is_battery_present(void)
 {
 	int mv_reading;
-#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
-    u16 batt_id = 0;
-#endif
-
 	mv_reading = 0;
 	batt_read_adc(CHANNEL_ADC_BATT_THERM, &mv_reading);
 	pr_err("%s: therm_raw is %d\n", __func__, mv_reading);
+#ifdef CONFIG_LGE_PM_IGNORE_BATT_THERM_FOR_EVENTS
+	mv_reading = 960;
+#endif
 	if (mv_reading > 0 && mv_reading < BATT_THERM_OPEN_MV)
 		return 1;
-
-#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
-    batt_id = battery_info_get();
-
-    if(batt_id == BATT_UNKNOWN)
-   	{   	    
-	    return 0;
-   	}
-    else
-        return 1;
-#endif
+    return 0;
 }
 
 static int pm8058_get_battery_temperature(void)
 {
-#if defined(CONFIG_MACH_LGE_I_BOARD_VZW)
-		if((lge_bd_rev == 2 ) ||(lge_bd_rev == 3 )) // rev.A, rev.B
-			return 30;
-		else
-#elif defined(CONFIG_MACH_LGE_I_BOARD_LGU)
-		if(lge_bd_rev == 2 )// rev.A, rev.B
-			return 30;
-		else
-#endif			
+#ifdef CONFIG_LGE_PM_IGNORE_BATT_THERM_FOR_EVENTS
+	return 38;
+#else
 	return batt_read_adc(CHANNEL_ADC_BATT_THERM, NULL);
+#endif
 }
 
 #ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
@@ -2182,10 +2197,23 @@ static int pm8058_get_battery_temperature_adc(void)
 
 	mv_reading = 0;
 	batt_read_adc(CHANNEL_ADC_BATT_THERM, &mv_reading);
-	//pr_err("%s: therm_raw is %d\n", __func__, mv_reading);
+	pr_err("%s: therm_raw is %d\n", __func__, mv_reading);
+#ifdef CONFIG_LGE_PM_IGNORE_BATT_THERM_FOR_EVENTS
+	return 960;
+#else
 	return mv_reading;
+#endif
+
 }
 #endif
+
+int testmode_battery_read_temperature_adc(void)
+{
+	int batt_adc;
+	batt_adc = pm8058_get_battery_temperature_adc();
+	return batt_adc;
+}
+EXPORT_SYMBOL(testmode_battery_read_temperature_adc);
 
 #ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
 /* kiwone.seo@lge.com, we will check later. because temp is not matching */
@@ -2222,7 +2250,8 @@ static int pm8058_is_battery_id_valid(void)
 
     if(batt_id == BATT_UNKNOWN)
    	{   	    
-	    return 0;
+/* ws.chang@lge.com 2011-06-10, Temporarily Battery ID TRUE, Battery ID Pin is Ground in Cayman, This Function must be removed in Cayman */
+	    return 1; //0;
    	}
     else
         return 1;
@@ -2259,7 +2288,6 @@ static int pm8058_get_battery_mvolts(void)
 #ifdef CONFIG_LGE_FUEL_GAUGE
 //	max17040_update_rcomp(batt_read_adc(CHANNEL_ADC_BATT_THERM, NULL));
 	max17040_update_rcomp(g_temp);
-
 	vbatt_mv = max17040_get_battery_mvolts();
 #else
 	vbatt_mv = batt_read_adc(CHANNEL_ADC_VBATT, NULL);
@@ -2411,20 +2439,6 @@ static int __devinit pm8058_charger_probe(struct platform_device *pdev)
 #ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
 /* kiwone.seo@lge.com, we must enable batt temp monitoring. because the interrupt never be occured 
 and must change register value in HW. */
-#if defined(CONFIG_MACH_LGE_I_BOARD_VZW)
-	if((lge_bd_rev == 2 ) ||(lge_bd_rev == 3 )) // rev.A, rev.B
-		pm_chg_batt_temp_disable(1);
-	else
-		pm_chg_batt_temp_disable(0);
-#elif defined(CONFIG_MACH_LGE_I_BOARD_LGU)
-	if(lge_bd_rev > 2 ) // more than rev.B
-		pm_chg_batt_temp_disable(0);
-	else
-		pm_chg_batt_temp_disable(1);
-#else
-	pm_chg_batt_temp_disable(1);
-#endif
-#else
 	pm_chg_batt_temp_disable(0);
 #endif
 
@@ -2454,7 +2468,7 @@ and must change register value in HW. */
 	 * regardless of whether they're both activated.
 	 */
 #ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-	rc = pm8058_batt_alarm_threshold_set(AUTO_CHARGING_RESUME_MV_CALC(lge_battery_info), (4350-(lge_battery_info*150)) );
+	rc = pm8058_batt_alarm_threshold_set(resume_mv, 4200);
 #else
 	rc = pm8058_batt_alarm_threshold_set(resume_mv, 4300);
 #endif

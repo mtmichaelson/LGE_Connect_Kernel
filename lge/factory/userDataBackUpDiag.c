@@ -42,6 +42,7 @@ Copyright (c) 2010 LG Electronics. All right reserved.
 //#include "diagBuf.h"
 //#include "UserDataBackUp.h"
 #include <linux/slab.h>
+#include <linux/delay.h>
 
 // LG_FW : 2011.07.06 moon.yongho : saving webdload status variable to eMMC. ----------[[
 #include "lg_diag_cfg.h"
@@ -180,23 +181,27 @@ boolean userDataBackUpBadCalc(void)
 
 boolean userDataBackUpPartitionErase(void )
 {
-	 int mtd_op_result ;
-	 mtd_op_result = lge_erase_block(srd_bytes_pos_in_emmc, (size_t)(SRD_1MBYTE_AREA*SRD_FIRST_AREA_INPARTITION));
-	  if(mtd_op_result != (SRD_1MBYTE_AREA*SRD_FIRST_AREA_INPARTITION))
-	 {
-          printk(KERN_ERR "[Testmode]lge_write_block, error num = %d \n", mtd_op_result);
-         //  rsp_pkt->header.err_code = TEST_FAIL_S;        
-         return FALSE;
-        }
-
+	int mtd_op_result ;
+	int retry_count=3;
+	do{
+		msleep(100);
+		retry_count--;
+		mtd_op_result = lge_erase_block(srd_bytes_pos_in_emmc, (size_t)(SRD_1MBYTE_AREA*SRD_FIRST_AREA_INPARTITION));
+		if (retry_count==0){
+		 	break;
+		}
+	 }while(mtd_op_result != (SRD_1MBYTE_AREA*SRD_FIRST_AREA_INPARTITION));
+	 
 	// srd_bytes_pos_in_emmc+0x400000  for  MDM 
 	  mtd_op_result = lge_erase_block(srd_bytes_pos_in_emmc+0x400000, (size_t)(SRD_1MBYTE_AREA));
-	  if(mtd_op_result != (SRD_1MBYTE_AREA*SRD_FIRST_AREA_INPARTITION))
+	 if(mtd_op_result != (SRD_1MBYTE_AREA*SRD_FIRST_AREA_INPARTITION))
 	 {
           printk(KERN_ERR "[Testmode]lge_write_block, error num = %d \n", mtd_op_result);
          //  rsp_pkt->header.err_code = TEST_FAIL_S;        
          return FALSE;
         }
+	 
+	  
 	 //현재 1mbyte 만 지움. ..
 #if 0
 	int i;  
@@ -450,12 +455,12 @@ SIDE EFFECTS
 
 Error:
    rsp_pkt->header.err_code = UDBU_ERROR_CANNOT_COMPLETE;
+
+
 }
 EXPORT_SYMBOL(diag_SRD_Init);
 
 #endif //#ifdef CONFIG_LGE_DLOAD_SRD  //kabjoo.choi
-
-
 // LG_FW : 2011.07.07 moon.yongho : saving webdload status variable to eMMC. ----------[[
 #ifdef LG_FW_WEB_DOWNLOAD	
 unsigned int web_status_bytes_pos_in_emmc = 0;
@@ -496,8 +501,6 @@ boolean userWebDnBadCalc(void)
 EXPORT_SYMBOL(diag_WebDL_SRD_Init);	
 #endif /*LG_FW_WEB_DOWNLOAD*/	
 // LG_FW : 2011.07.07 moon.yongho ----------------------------------------------------]]	
-
-
 
 #if 0
 /*===========================================================================

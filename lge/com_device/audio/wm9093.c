@@ -26,7 +26,7 @@
 #include <linux/slab.h>
 #include "wm9093.h"
 
-#define	DEBUG_AMP_CTL	1
+#define	DEBUG_AMP_CTL	0
 
 #define MODULE_NAME	"wm9093"
 
@@ -91,7 +91,7 @@ static int amp_write_register(u8 reg, int value)
 
 void check_audio_i2c_data(int RtnVal, wmCodecCmd wmReg)
 {
-#if 0//def DEBUG_AMP_CTL
+#ifdef DEBUG_AMP_CTL
 	int rtnRD = 0;
 	int wmrData = 0;
 	
@@ -281,11 +281,6 @@ void wm9093_set_amp_path(int icodec_num)
         case ICODEC_SPEAKER_PLAYBACK_RX:   // Playback not call
             D(KERN_INFO "voc_codec %d for ICODEC_SPEAKER_PLAYBACK_RX amp\n", icodec_num);
             wm9093_cmd_register_sequence(&(_data->pdata->speaker_playback_on));
-            break;
-
-        case ICODEC_SPEAKER_PLAYBACK_VZWNAVI:   // Playback not call
-            D(KERN_INFO "voc_codec %d for ICODEC_SPEAKER_VZW_NAVI amp\n", icodec_num);
-            wm9093_cmd_register_sequence(&(_data->pdata->speaker_vzwnavi_on));
             break;
 
         case ICODEC_HEADSET_ST_PLAYBACK_RX:   // Playback not call

@@ -56,8 +56,8 @@ struct completion mdp_ppp_comp;
 struct semaphore mdp_ppp_mutex;
 struct semaphore mdp_pipe_ctrl_mutex;
 
-// to guarantee lcd panel off before mdp block power off - mdp_timer_duration increase 50ms ->1s 
-unsigned long mdp_timer_duration = HZ; // (HZ/20);   /* 50 msecond */
+//unsigned long mdp_timer_duration = (HZ/20);   /* 50 msecond */
+unsigned long mdp_timer_duration = HZ/10; // (HZ/20);   /* 50 msecond */
 
 boolean mdp_ppp_waiting = FALSE;
 uint32 mdp_tv_underflow_cnt;

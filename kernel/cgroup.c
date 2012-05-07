@@ -2055,11 +2055,24 @@ static int cgroup_file_open(struct inode *inode, struct file *file)
 {
 	int err;
 	struct cftype *cft;
-
+#if 1 //ys.seong 2012.01.10 LGU+ workaround code
+	int l_count = 5;
+#endif 
+	
 	err = generic_file_open(inode, file);
 	if (err)
 		return err;
+
+
+
+#if 1 //ys.seong 2012.01.10 LGU+ workaround code
+	do{
+		smp_rmb();
+		cft = __d_cft(file->f_dentry);
+	} while ( (--l_count > 0) && !(cft) );
+#else
 	cft = __d_cft(file->f_dentry);
+#endif
 
 	if (cft->read_map || cft->read_seq_string) {
 		struct cgroup_seqfile_state *state =

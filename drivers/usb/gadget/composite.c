@@ -105,16 +105,10 @@ static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR, enable_show, enable_store);
 
 void usb_function_set_enabled(struct usb_function *f, int enabled)
 {
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
-    if(f->disabled != !enabled)
-    {
-#endif
 	f->disabled = !enabled;
 	kobject_uevent(&f->dev->kobj, KOBJ_CHANGE);
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
 }
-#endif
-}
+
 
 void usb_composite_force_reset(struct usb_composite_dev *cdev)
 {
@@ -347,12 +341,7 @@ static int config_buf(struct usb_configuration *config,
 		else
 			descriptors = f->descriptors;
 		if (f->disabled || !descriptors || descriptors[0] == NULL)
-//			pr_err("f->name : %s, disabled : %d\n", f->name, f->disabled);
-
-//seunghun.kim
 			continue;
-//seunghun.kim
-//seunghun.kim
 		status = usb_descriptor_fillbuf(next, len,
 			(const struct usb_descriptor_header **) descriptors);
 		if (status < 0)

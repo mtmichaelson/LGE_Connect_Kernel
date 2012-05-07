@@ -620,7 +620,7 @@ static int kgsl_yamato_start(struct kgsl_device *device, unsigned int init_ram)
 			      init_reftimestamp);
 
 	kgsl_yamato_regwrite(device, REG_RBBM_DEBUG, 0x00080000);
-
+	
 	kgsl_yamato_regwrite(device, REG_RBBM_INT_CNTL, GSL_RBBM_INT_MASK);
 
 	/* make sure SQ interrupts are disabled */
@@ -1127,25 +1127,12 @@ static int kgsl_check_interrupt_timestamp(struct kgsl_device *device,
  process to already be in its wait q when its exit condition checking
  function is called.
 */
-#ifndef QCT_PATCH_GPU_IO_FRACTION
-#define kgsl_wait_event_interruptible_timeout(wq, condition, timeout, io)\
-({									\
-	long __ret = timeout;						\
-	if (io)						\
-		__wait_io_event_interruptible_timeout(wq, condition, __ret);\
-	else						\
-		__wait_event_interruptible_timeout(wq, condition, __ret);\
-	__ret;								\
-})
-
-#else
 #define kgsl_wait_io_event_interruptible_timeout(wq, condition, timeout)\
 ({									\
 	long __ret = timeout;						\
 	__wait_io_event_interruptible_timeout(wq, condition, __ret);	\
 	__ret;								\
 })
-#endif
 
 /* MUST be called with the device mutex held */
 static int kgsl_yamato_waittimestamp(struct kgsl_device *device,
@@ -1153,11 +1140,6 @@ static int kgsl_yamato_waittimestamp(struct kgsl_device *device,
 				unsigned int msecs)
 {
 	long status = 0;
-#ifndef QCT_PATCH_GPU_IO_FRACTION
-	uint io = 1;
-	static uint io_cnt;
-	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
-#endif
 	struct kgsl_yamato_device *yamato_device = KGSL_YAMATO_DEVICE(device);
 
 	if (timestamp != yamato_device->ringbuffer.timestamp &&
@@ -1170,28 +1152,15 @@ static int kgsl_yamato_waittimestamp(struct kgsl_device *device,
 		goto done;
 	}
 	if (!kgsl_check_timestamp(device, timestamp)) {
-#ifndef QCT_PATCH_GPU_IO_FRACTION
-		io_cnt = (io_cnt + 1) % 100;
-		if (io_cnt < pwr->pwrlevels[pwr->active_pwrlevel].io_fraction)
-			io = 0;
-#endif
 		mutex_unlock(&device->mutex);
 		/* We need to make sure that the process is placed in wait-q
 		 * before its condition is called */
-#ifndef QCT_PATCH_GPU_IO_FRACTION
-		status = kgsl_wait_event_interruptible_timeout(
-				device->wait_queue,
-				kgsl_check_interrupt_timestamp(device,
-					timestamp),
-				msecs_to_jiffies(msecs), io);
-		mutex_lock(&device->mutex);
-#else
 		status = kgsl_wait_io_event_interruptible_timeout(
 				device->wait_queue,
 				kgsl_check_interrupt_timestamp(device,
 					timestamp), msecs_to_jiffies(msecs));
 		mutex_lock(&device->mutex);
-#endif
+
 		if (status > 0)
 			status = 0;
 		else if (status == 0) {

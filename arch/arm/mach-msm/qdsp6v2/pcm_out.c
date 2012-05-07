@@ -60,6 +60,7 @@ void pcm_out_cb(uint32_t opcode, uint32_t token,
 {
 	struct pcm *pcm = (struct pcm *) priv;
 	unsigned long flags;
+	pr_info( "%s \n", __func__);
 
 	spin_lock_irqsave(&pcm->dsp_lock, flags);
 	switch (opcode) {
@@ -68,6 +69,8 @@ void pcm_out_cb(uint32_t opcode, uint32_t token,
 		wake_up(&pcm->write_wait);
 		break;
 	default:
+	 pr_info("%s:session id %d: Ignore opcode[0x%x]\n", __func__,
+			pcm->ac->session, opcode);
 		break;
 	}
 	spin_unlock_irqrestore(&pcm->dsp_lock, flags);
@@ -251,7 +254,7 @@ static long pcm_out_ioctl(struct file *file, unsigned int cmd,
 		pcm->channel_count = config.channel_count;
 		pcm->buffer_size = config.buffer_size;
 		pcm->buffer_count = config.buffer_count;
-		pr_debug("%s:buffer_size:%d buffer_count:%d sample_rate:%d \
+		pr_info("%s:buffer_size:%d buffer_count:%d sample_rate:%d \
 			channel_count:%d\n",  __func__, pcm->buffer_size,
 			pcm->buffer_count, pcm->sample_rate,
 			pcm->channel_count);
@@ -380,7 +383,7 @@ static ssize_t pcm_out_write(struct file *file, const char __user *buf,
 		if (rc < 0)
 			return rc;
 	}
-
+//        pr_info( " %s \n", __func__);
 	mutex_lock(&pcm->write_lock);
 	while (count > 0) {
 		rc = wait_event_timeout(pcm->write_wait,

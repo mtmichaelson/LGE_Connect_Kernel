@@ -47,7 +47,7 @@ enum {
 	/*
 	 * list of oem rapi client events
 	 */
-#if defined (CONFIG_LGE_SUPPORT_RAPI)
+#ifdef CONFIG_LGE_SUPPORT_RAPI
 	
 	LG_FW_RAPI_START = 100,
 	LG_FW_RAPI_CLIENT_EVENT_GET_LINE_TYPE = LG_FW_RAPI_START,
@@ -68,7 +68,7 @@ enum {
 #endif
 #ifdef CONFIG_LGE_DLOAD_SRD 
 	LG_FW_REQUEST_SRD_RPC = LG_FW_RAPI_START + 10,  //kabjoo.choi
-#endif
+#endif 	
 
 #ifdef CONFIG_LGE_DLOAD_SRD 
 	LG_FW_RAPI_ERI_DIAG_WRITE= LG_FW_RAPI_START + 11,   //uts dll
@@ -85,15 +85,21 @@ enum {
 // LG_FW : 2011.07.07 moon.yongho -----------------------------------------------------]]
 
 
-//DID BACKUP  support   kabjoo.choi
-	LG_FW_DID_BACKUP_REQUEST= LG_FW_RAPI_START + 17, 	
-
-
-
 // LG_FW [START] : 2011.08.05 jongan.kim : get SW_VER from modem for EUT
 	LG_FW_SW_VERSION_GET = LG_FW_RAPI_START + 15,
 	LG_FW_SUB_VERSION_GET = LG_FW_RAPI_START + 16,
 // LG_FW [END] : 2011.08.05 jongan.kim
+
+	
+//DID BACKUP  support	kabjoo.choi
+	LG_FW_DID_BACKUP_REQUEST= LG_FW_RAPI_START + 17,	
+	
+//START FOTA_LGE_BSP miracle.kim@lge.com 2011-08-09 for fota misc info
+#ifdef CONFIG_LGE_FOTA_MISC_INFO
+	LGE_REMOTE_RPC_REQUEST_VAL = LG_FW_RAPI_START + 18,
+#endif	
+//END FOTA_LGE_BSP miracle.kim@lge.com 2011-08-09 for fota misc info
+
 
 
 	LG_MSG_UNIFIEDMSGTOOL_FROM_ARM11 = 200, //#ifdef LG_SMS_PC_TEST
@@ -102,6 +108,20 @@ enum {
 	OEM_RAPI_CLIENT_EVENT_MAX
 
 };
+
+//START FOTA_LGE_BSP miracle.kim@lge.com 2011-08-09 for fota misc info
+#ifdef CONFIG_LGE_SUPPORT_RAPI
+enum {
+        LGE_CLIENT_CMD_START = 0,
+#ifdef CONFIG_LGE_SYNC_CMD
+        LGE_SYNC_REQUEST = 1,
+#endif
+        LGE_SW_VERSION_INFO = 2,
+        LGE_MIN_INFO = 3,
+        LGE_TESTMODE_MANUAL_TEST_INFO = 4,
+        LGE_CLIENT_CMD_MAX = 0xF,
+};
+#endif
 
 struct oem_rapi_client_streaming_func_cb_arg {
 	uint32_t  event;

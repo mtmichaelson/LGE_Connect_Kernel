@@ -605,16 +605,7 @@ int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum)
 	ret = msm_hsusb_send_productID(pid);
 	if (ret)
 		return ret;
-#ifdef CONFIG_LGE_USB_GADGET_F_DIAG_RPC
-    if (!snum) {
-		(void)msm_hsusb_is_serial_num_null(1);
-    }
-	else
-	{
-	    (void)msm_hsusb_is_serial_num_null(0);
-		(void)msm_hsusb_send_serial_number(snum);
-	}
-#else
+
 	if (!snum) {
 		ret = msm_hsusb_is_serial_num_null(1);
 		if (ret)
@@ -627,7 +618,7 @@ int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum)
 	ret = msm_hsusb_send_serial_number(snum);
 	if (ret)
 		return ret;
-#endif
+
 	return 0;
 }
 

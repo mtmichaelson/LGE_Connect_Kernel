@@ -305,6 +305,11 @@ module_param(fsg_nofua, ulong, S_IRUGO);
 MODULE_PARM_DESC(fsg_nofua, "FUA Flag state in SCSI WRITE");
 
 #define FUNCTION_NAME		"usb_mass_storage"
+
+#ifdef CONFIG_LGE_USB_AUTORUN
+#define FUNCTION_NAME_CDROM		"cdrom"
+#endif
+
 /*------------------------------------------------------------------------*/
 
 #define FSG_DRIVER_DESC		"Mass Storage Function"
@@ -320,6 +325,82 @@ static const char fsg_string_interface[] = "Mass Storage";
 
 #include "storage_common.c"
 
+#ifdef CONFIG_LGE_USB_AUTORUN
+#define SC_LGE_SPE            0xF1
+#define SUB_CODE_MODE_CHANGE  0x01
+#define SUB_CODE_GET_VALUE		0x02
+#define SUB_CODE_PROBE_DEV		0xff
+#define TYPE_MOD_CHG_TO_ACM		0x01
+#define TYPE_MOD_CHG_TO_UMS		0x02
+#define TYPE_MOD_CHG_TO_ASK		0x05
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+#define TYPE_MOD_CHG_TO_TET		0x09
+#endif
+#define TYPE_MOD_CHG2_TO_ACM  0x81
+#define TYPE_MOD_CHG2_TO_UMS  0x82
+#define TYPE_MOD_CHG2_TO_ASK  0x85
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+#define TYPE_MOD_CHG2_TO_TET  0x87
+#endif
+/*ACK TO SEND HOST PC */
+#define ACK_STATUS_TO_HOST		0x10
+#define ACK_SW_REV_TO_HOST		0x12
+#define ACK_MEID_TO_HOST		0x13
+#define ACK_MODEL_TO_HOST		0x14
+#define ACK_SUB_VER_TO_HOST		0x15
+#define SUB_ACK_STATUS_ACM		0x00
+#define SUB_ACK_STATUS_UMS		0x02
+#define SUB_ACK_STATUS_ASK		0x03
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+#define SUB_ACK_STATUS_TET		0x05
+#endif
+#endif
+
+#ifdef CONFIG_LGE_USB_AUTORUN
+static const char *chg_mode[] = {	
+	"change_unknown",
+	"change_acm",
+	"change_ums", 
+	"change_ask", 
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+	"change_tether",
+#endif
+	"query_value",
+	"device_info",
+};
+
+enum chg_mode_state{
+	MODE_STATE_UNKNOWN = 0,
+	MODE_STATE_ACM,
+	MODE_STATE_UMS,
+	MODE_STATE_ASK,
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+	MODE_STATE_TET,
+#endif
+	MODE_STATE_GET_VALUE,
+	MODE_STATE_PROBE_DEV,
+};
+
+static const char *check_str[] = {
+	"ACK_STATUS_ACM",
+	"ACK_STATUS_UMS",
+	"ACK_STATUS_ASK",
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+	"ACK_STATUS_TET",
+#endif
+};
+
+enum check_mode_state {
+	ACK_STATUS_ACM = SUB_ACK_STATUS_ACM,
+	ACK_STATUS_UMS = SUB_ACK_STATUS_UMS,
+	ACK_STATUS_ASK = SUB_ACK_STATUS_ASK,
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+	ACK_STATUS_TET = SUB_ACK_STATUS_TET,
+#endif
+	ACK_STATUS_ERR,
+};
+#endif
+
 #ifdef CONFIG_USB_CSW_HACK
 static int write_error_after_csw_sent;
 static int csw_hack_sent;
@@ -328,6 +409,11 @@ static int csw_hack_sent;
 
 struct fsg_dev;
 
+#ifdef CONFIG_LGE_USB_AUTORUN
+static struct fsg_dev			*the_fsg;
+static unsigned int user_mode = 0;
+extern int get_autorun_user_mode(void);
+#endif
 
 /* Data shared by all the FSG instances. */
 struct fsg_common {
@@ -360,6 +446,9 @@ struct fsg_common {
 
 	unsigned int		bulk_out_maxpacket;
 	enum fsg_state		state;		/* For exception handling */
+#ifdef CONFIG_LGE_USB_AUTORUN
+	enum chg_mode_state	mode_state;
+#endif  
 	unsigned int		exception_req_tag;
 
 	enum data_direction	data_dir;
@@ -483,7 +572,12 @@ static void set_bulk_out_req_length(struct fsg_common *common,
 	rem = length % common->bulk_out_maxpacket;
 	if (rem > 0)
 		length += common->bulk_out_maxpacket - rem;
+#ifdef CONFIG_LGE_USB_AUTORUN
+  if (bh->outreq)
+    bh->outreq->length = length;
+#else /* below is original */
 	bh->outreq->length = length;
+#endif
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1237,6 +1331,81 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	return 36;
 }
 
+#ifdef CONFIG_LGE_USB_AUTORUN	
+static int do_ack_status(struct fsg_common *common, struct fsg_buffhd *bh, u8 ack)
+{
+  struct fsg_lun *curlun = common->curlun;
+	u8	*buf = (u8 *) bh->buf;
+	
+	if (!curlun) {		/* Unsupported LUNs are okay */
+		common->bad_lun_okay = 1;
+		memset(buf, 0, 1);
+		buf[0] = 0xf;		
+		return 1;
+	}
+	
+	if(ack == SUB_ACK_STATUS_ACM)
+		buf[0] = SUB_ACK_STATUS_ACM;
+	else if(ack == SUB_ACK_STATUS_UMS)
+		buf[0] = SUB_ACK_STATUS_UMS;
+	else if(ack == SUB_ACK_STATUS_ASK)
+		buf[0] = SUB_ACK_STATUS_ASK;
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+	else if(ack == SUB_ACK_STATUS_TET)
+		buf[0] = SUB_ACK_STATUS_TET;
+#endif
+
+	return 1;
+}
+static int do_get_sw_rev(struct fsg_common *common, struct fsg_buffhd *bh)
+{
+	u8	*buf = (u8 *) bh->buf;	
+	
+	memset(buf, 0, 7);	
+
+	buf[0] = 2;	
+	buf[1] = 1;	
+	buf[5] = 1;	
+	buf[6] = 2;	
+	return 7;
+}
+static int do_get_meid(struct fsg_common *common, struct fsg_buffhd *bh)
+{
+	u8	*buf = (u8 *) bh->buf;	
+	
+	memset(buf, 0, 7);	
+
+	buf[0] = 3;	
+	buf[1] = 1;	
+	buf[5] = 1;	
+	buf[6] = 3;	
+	return 7;
+}
+static int do_get_model(struct fsg_common *common, struct fsg_buffhd *bh)
+{
+	u8	*buf = (u8 *) bh->buf;	
+	
+	memset(buf, 0, 7);	
+
+	buf[0] = 4;	
+	buf[1] = 1;	
+	buf[5] = 1;	
+	buf[6] = 4;	
+	return 7;
+}
+static int do_get_sub_ver(struct fsg_common *common, struct fsg_buffhd *bh)
+{
+	u8	*buf = (u8 *) bh->buf;	
+	
+	memset(buf, 0, 7);	
+
+	buf[0] = 5;	
+	buf[1] = 1;	
+	buf[5] = 1;	
+	buf[6] = 5;	
+	return 7;
+}
+#endif
 
 static int do_request_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 {
@@ -2011,6 +2180,117 @@ static int do_scsi_command(struct fsg_common *common)
 			reply = do_inquiry(common, bh);
 		break;
 
+#ifdef CONFIG_LGE_USB_AUTORUN
+    case SC_LGE_SPE:
+      pr_info("%s : SC_LGE_SPE - %x %x %x\n", __func__,
+          common->cmnd[0], common->cmnd[1], common->cmnd[2]);
+  
+      common->mode_state = MODE_STATE_UNKNOWN;
+      switch(common->cmnd[1])
+      {
+        case SUB_CODE_MODE_CHANGE:
+          switch(common->cmnd[2])
+          {
+            case TYPE_MOD_CHG_TO_ACM :
+            case TYPE_MOD_CHG2_TO_ACM :
+              common->mode_state = MODE_STATE_ACM;
+              break;
+            case TYPE_MOD_CHG_TO_UMS :
+            case TYPE_MOD_CHG2_TO_UMS :
+              common->mode_state = MODE_STATE_UMS;
+              break;
+            case TYPE_MOD_CHG_TO_ASK :
+            case TYPE_MOD_CHG2_TO_ASK :
+              common->mode_state = MODE_STATE_ASK;
+              break;
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+            case TYPE_MOD_CHG_TO_TET :
+            case TYPE_MOD_CHG2_TO_TET :
+              common->mode_state = MODE_STATE_TET;
+              break;
+#endif
+            default:
+              common->mode_state = MODE_STATE_UNKNOWN;
+          }
+          pr_info("%s : SC_LGE_MODE - %d\n", __func__, common->mode_state);
+          if (common->curlun->cdrom && &the_fsg->sdev) {
+            printk(KERN_ERR "LG_FW :: AUTORUN 1 \n");
+            switch_set_state(&the_fsg->sdev, common->mode_state);
+            /* For Refreshing Uevent, This Uevent will be ignore by 
+               AutoRun APK */
+          //  printk(KERN_ERR "LG_FW :: AUTORUN 2 \n");
+          //  switch_set_state(&fsg->autorun_sdev, MODE_STATE_UNKNOWN);
+          }
+          reply = 0;  
+          break;
+        case SUB_CODE_GET_VALUE:  
+          switch(common->cmnd[2])
+          {
+            case ACK_STATUS_TO_HOST : // 0xf1 0x02 0x10
+              /* If some error exists, we set default mode
+                 to ACM mode */
+              user_mode = get_autorun_user_mode();
+              common->mode_state = MODE_STATE_GET_VALUE;
+              if (user_mode >= ACK_STATUS_ERR) {
+                pr_err("%s [AUTORUN] : Error on user mode setting, set default mode (ACM)\n", __func__);
+                user_mode = ACK_STATUS_ACM;
+              } else 
+                pr_info("%s [AUTORUN] : send user mode to PC -> %s\n", __func__, check_str[user_mode]);
+  
+              common->data_size_from_cmnd = 1;
+              if ((reply = check_command(common, 6, DATA_DIR_TO_HOST,
+                      (7<<1), 1, check_str[user_mode])) == 0)
+                reply=do_ack_status(common, bh, user_mode);
+  
+              /* For reseting Autorun App watchdog timer */
+              if (common->curlun->cdrom && &the_fsg->sdev)
+              {
+                  printk(KERN_ERR "LG_FW :: AUTORUN 3 \n");
+                switch_set_state(&the_fsg->sdev, common->mode_state);
+              }
+              break;
+            case ACK_SW_REV_TO_HOST : // 0xf1 0x02 0x12
+              common->data_size_from_cmnd = 7;
+              if ((reply = check_command(common, 6, DATA_DIR_TO_HOST,
+                      (7<<1), 1, "ACK_SW_REV")) == 0)
+                reply=do_get_sw_rev(common, bh);
+              break;
+            case ACK_MEID_TO_HOST :   // 0xf1 0x02 0x13
+              common->data_size_from_cmnd = 7;
+              if ((reply = check_command(common, 6, DATA_DIR_TO_HOST,
+                      (7<<1), 1, "ACK_MEID")) == 0)
+                reply=do_get_meid(common, bh);
+              break;
+            case ACK_MODEL_TO_HOST :  // 0xf1 0x02 0x14 
+              common->data_size_from_cmnd = 7;
+              if ((reply = check_command(common, 6, DATA_DIR_TO_HOST,
+                      (7<<1), 1, "ACK_MODEL_NAME")) == 0)
+                reply=do_get_model(common, bh);
+              break;
+            case ACK_SUB_VER_TO_HOST: // 0xf1 0x02 0x15  
+              common->data_size_from_cmnd = 7;
+              if ((reply = check_command(common, 6, DATA_DIR_TO_HOST,
+                      (7<<1), 1, "ACK_SUB_VERSION")) == 0)
+                reply=do_get_sub_ver(common, bh);
+              break;
+            default:
+              break;  
+          }
+          
+          break;
+        case SUB_CODE_PROBE_DEV:
+          common->mode_state = MODE_STATE_PROBE_DEV;
+          reply=0;
+          break;
+        default:
+          common->mode_state = MODE_STATE_UNKNOWN;
+          reply=0;
+          break;
+      }
+      
+      break;
+#endif
+
 	case SC_MODE_SELECT_6:
 		common->data_size_from_cmnd = common->cmnd[4];
 		reply = check_command(common, 6, DATA_DIR_FROM_HOST,
@@ -2495,7 +2775,10 @@ static void fsg_disable(struct usb_function *f)
 
 /*-------------------------------------------------------------------------*/
 
+#ifndef CONFIG_LGE_USB_AUTORUN
+/* move declaration region */
 static struct fsg_dev			*the_fsg;
+#endif
 
 static void handle_exception(struct fsg_common *common)
 {
@@ -2754,9 +3037,15 @@ static inline void fsg_common_put(struct fsg_common *common)
 }
 
 
+#ifdef CONFIG_LGE_USB_AUTORUN
+static struct fsg_common *fsg_common_init(struct fsg_common *common,
+					  struct usb_composite_dev *cdev,
+					  struct fsg_config *cfg, int cdrom)
+#else /* below is original */
 static struct fsg_common *fsg_common_init(struct fsg_common *common,
 					  struct usb_composite_dev *cdev,
 					  struct fsg_config *cfg)
+#endif
 {
 	struct usb_gadget *gadget = cdev->gadget;
 	struct fsg_buffhd *bh;
@@ -2764,6 +3053,16 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	struct fsg_lun_config *lcfg;
 	int nluns, i, rc;
 	char *pathbuf;
+
+#ifdef CONFIG_LGE_USB_AUTORUN
+	cfg->nluns = 1;
+	cfg->luns[0].removable = 1;
+	cfg->vendor_name = "LGE";
+	if (cdrom)
+		cfg->product_name = "CDROM";
+	else
+		cfg->product_name = "Mass Storage";
+#endif
 
 	/* Find out how many LUNs there should be */
 	nluns = cfg->nluns;
@@ -2810,25 +3109,53 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	init_rwsem(&common->filesem);
 
 	for (i = 0, lcfg = cfg->luns; i < nluns; ++i, ++curlun, ++lcfg) {
+#ifdef CONFIG_LGE_USB_AUTORUN
+    if (cdrom) {
+      curlun->cdrom = 1;
+      curlun->ro = 1;
+    }
+    else {
+      curlun->cdrom = 0;
+      curlun->ro = 0;
+    }
+    curlun->removable = lcfg->removable;
+    curlun->dev.release = fsg_lun_release;
+#else /* below is original */
 		curlun->cdrom = !!lcfg->cdrom;
 		curlun->ro = lcfg->cdrom || lcfg->ro;
 		curlun->removable = lcfg->removable;
 		curlun->dev.release = fsg_lun_release;
 		curlun->nofua = lcfg->nofua;
+#endif
 
+#ifdef CONFIG_LGE_USB_AUTORUN
+    /* use "gadget" device as parent */
+    curlun->dev.parent = &gadget->dev;
+#else /* below is original */
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 		/* use "usb_mass_storage" platform device as parent */
 		curlun->dev.parent = &cfg->pdev->dev;
 #else
 		curlun->dev.parent = &gadget->dev;
 #endif
+#endif
+
 		/* curlun->dev.driver = &fsg_driver.driver; XXX */
 		dev_set_drvdata(&curlun->dev, &common->filesem);
+#ifdef CONFIG_LGE_USB_AUTORUN
+    /*  lun0 : cdrom(ro), lun1 : externel sd-card(rw), lun2: reserved for internel storage(rw) */
+		dev_set_name(&curlun->dev,
+			     cfg->lun_name_format
+			   ? cfg->lun_name_format
+			   : "lun%d",
+			     !cdrom);
+#else /* below is original */
 		dev_set_name(&curlun->dev,
 			     cfg->lun_name_format
 			   ? cfg->lun_name_format
 			   : "lun%d",
 			     i);
+#endif
 
 		rc = device_register(&curlun->dev);
 		if (rc) {
@@ -2915,9 +3242,20 @@ buffhds_first_it:
 
 	/* Tell the thread to start working */
 	common->thread_exits = cfg->thread_exits;
+#ifdef CONFIG_LGE_USB_AUTORUN
+  if(cdrom)
+    common->thread_task =
+      kthread_create(fsg_main_thread, common,
+               OR(cfg->thread_name, "file-cdrom"));
+  else
+    common->thread_task =
+      kthread_create(fsg_main_thread, common,
+               OR(cfg->thread_name, "file-storage"));
+#else /* below is original */
 	common->thread_task =
 		kthread_create(fsg_main_thread, common,
 			       OR(cfg->thread_name, "file-storage"));
+#endif
 	if (IS_ERR(common->thread_task)) {
 		rc = PTR_ERR(common->thread_task);
 		goto error_release;
@@ -3110,9 +3448,28 @@ static ssize_t print_switch_state(struct switch_dev *sdev, char *buf)
 	return sprintf(buf, "%s\n", (fsg->common->new_fsg ? "online" : "offline"));
 }
 
+#ifdef CONFIG_LGE_USB_AUTORUN
+static ssize_t print_switch_name_cdrom(struct switch_dev *sdev, char *buf)
+{
+	return sprintf(buf, "%s\n", FUNCTION_NAME_CDROM);
+}
+
+static ssize_t print_switch_state_cdrom(struct switch_dev *sdev, char *buf)
+{
+  pr_info("%s : send Uevent - %s\n", __func__,  chg_mode[sdev->state]);
+  return sprintf(buf, "%s\n", chg_mode[sdev->state]);
+}
+#endif
+
+#ifdef CONFIG_LGE_USB_AUTORUN
+static int fsg_add(struct usb_composite_dev *cdev,
+		   struct usb_configuration *c,
+		   struct fsg_common *common, int cdrom)
+#else /* below is original */
 static int fsg_add(struct usb_composite_dev *cdev,
 		   struct usb_configuration *c,
 		   struct fsg_common *common)
+#endif
 {
 	struct fsg_dev *fsg;
 	int rc;
@@ -3123,17 +3480,38 @@ static int fsg_add(struct usb_composite_dev *cdev,
 
 	the_fsg = fsg;
 
+#ifdef CONFIG_LGE_USB_AUTORUN
+  if (cdrom) {
+    fsg->sdev.name = FUNCTION_NAME_CDROM;
+    fsg->sdev.print_name = print_switch_name_cdrom;
+    fsg->sdev.print_state = print_switch_state_cdrom;
+  }
+  else {
 	fsg->sdev.name = FUNCTION_NAME;
 	fsg->sdev.print_name = print_switch_name;
 	fsg->sdev.print_state = print_switch_state;
+  }
+  rc = switch_dev_register(&fsg->sdev);
+#else /* below is original */
+  fsg->sdev.name = FUNCTION_NAME;
+  fsg->sdev.print_name = print_switch_name;
+	fsg->sdev.print_state = print_switch_state;
 	rc = switch_dev_register(&fsg->sdev);
+#endif
 	if (rc < 0)
 		return rc;
 
+#ifdef CONFIG_LGE_USB_AUTORUN
+  if (cdrom)
+    fsg->function.name      = FUNCTION_NAME_CDROM;
+  else
+    fsg->function.name      = FUNCTION_NAME; 
+#else /* below is original */
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 	fsg->function.name        = FUNCTION_NAME;
 #else
 	fsg->function.name        = FSG_DRIVER_DESC;
+#endif
 #endif
 	fsg->function.strings     = fsg_strings_array;
 	fsg->function.bind        = fsg_bind;
@@ -3248,13 +3626,18 @@ fsg_common_from_params(struct fsg_common *common,
 {
 	struct fsg_config cfg;
 	fsg_config_from_params(&cfg, params);
+#ifdef CONFIG_LGE_USB_AUTORUN 
+	return fsg_common_init(common, cdev, &cfg, common->luns->cdrom);
+#else /* below is original */
 	return fsg_common_init(common, cdev, &cfg);
+#endif
 }
 
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 
 static struct fsg_config fsg_cfg;
 
+#ifndef CONFIG_LGE_USB_AUTORUN
 static int fsg_probe(struct platform_device *pdev)
 {
 	struct usb_mass_storage_platform_data *pdata = pdev->dev.platform_data;
@@ -3285,13 +3668,36 @@ static struct platform_driver fsg_platform_driver = {
 	.driver = { .name = FUNCTION_NAME, },
 	.probe = fsg_probe,
 };
+#endif
+
+#ifdef CONFIG_LGE_USB_AUTORUN
+int cdrom_bind_config(struct usb_configuration *c)
+{
+	struct fsg_common *common = fsg_common_init(NULL, c->cdev, &fsg_cfg, 1);
+	if (IS_ERR(common))
+		return -1;
+	return fsg_add(c->cdev, c, common, 1);
+}
+
+static struct android_usb_function cdrom_function = {
+	.name = FUNCTION_NAME_CDROM,
+	.bind_config = cdrom_bind_config,
+};
+#endif
 
 int mass_storage_bind_config(struct usb_configuration *c)
 {
+#ifdef CONFIG_LGE_USB_AUTORUN
+  struct fsg_common *common = fsg_common_init(NULL, c->cdev, &fsg_cfg, 0);
+	if (IS_ERR(common))
+		return -1;
+	return fsg_add(c->cdev, c, common, 0);
+#else /* below is original */
 	struct fsg_common *common = fsg_common_init(NULL, c->cdev, &fsg_cfg);
 	if (IS_ERR(common))
 		return -1;
 	return fsg_add(c->cdev, c, common);
+#endif
 }
 
 static struct android_usb_function mass_storage_function = {
@@ -3301,10 +3707,16 @@ static struct android_usb_function mass_storage_function = {
 
 static int __init init(void)
 {
+#ifndef CONFIG_LGE_USB_AUTORUN
 	int		rc;
 	rc = platform_driver_register(&fsg_platform_driver);
 	if (rc != 0)
 		return rc;
+#endif
+
+#ifdef CONFIG_LGE_USB_AUTORUN
+	android_register_function(&cdrom_function);
+#endif
 	android_register_function(&mass_storage_function);
 	return 0;
 }module_init(init);

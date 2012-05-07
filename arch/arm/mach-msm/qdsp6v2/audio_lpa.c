@@ -52,6 +52,8 @@
 
 #define AUDLPA_EVENT_NUM 10 /* Default number of pre-allocated event packets */
 
+//#define FUNCTION_TRACE
+
 #define __CONTAINS(r, v, l) ({					\
 	typeof(r) __r = r;					\
 	typeof(v) __v = v;					\
@@ -82,6 +84,8 @@
 	int res = (IN_RANGE(__r1, __v) || IN_RANGE(__r1, __e));	\
 	res;							\
 })
+
+
 
 struct audlpa_event {
 	struct list_head list;
@@ -135,6 +139,10 @@ static void lpa_listner(u32 evt_id, union auddev_evt_data *evt_payload,
 	struct audio *audio = (struct audio *) private_data;
 	int rc  = 0;
 
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] lpa_listner\n");
+	#endif
+	
 	switch (evt_id) {
 	case AUDDEV_EVT_STREAM_VOL_CHG:
 		audio->volume = evt_payload->session_vol;
@@ -159,12 +167,20 @@ static void lpa_listner(u32 evt_id, union auddev_evt_data *evt_payload,
 
 static void audlpa_prevent_sleep(struct audio *audio)
 {
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_prevent_sleep\n");
+	#endif
+	
 	pr_debug("%s:\n", __func__);
 	wake_lock(&audio->wakelock);
 }
 
 static void audlpa_allow_sleep(struct audio *audio)
 {
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_allow_sleep\n");
+	#endif
+
 	pr_debug("%s:\n", __func__);
 	wake_unlock(&audio->wakelock);
 }
@@ -172,6 +188,10 @@ static void audlpa_allow_sleep(struct audio *audio)
 /* must be called with audio->lock held */
 static int audio_enable(struct audio *audio)
 {
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audio_enable\n");
+	#endif
+	
 	pr_debug("%s\n", __func__);
 
 	return q6asm_run(audio->ac, 0, 0, 0);
@@ -180,11 +200,16 @@ static int audio_enable(struct audio *audio)
 
 static void audlpa_async_flush(struct audio *audio)
 {
+	
 	struct audlpa_buffer_node *buf_node;
 	struct list_head *ptr, *next;
 	union msm_audio_event_payload payload;
 	int rc = 0;
 
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_async_flush\n");
+	#endif
+	
 	pr_debug("%s:out_enabled = %d, drv_status = 0x%x\n", __func__,
 			audio->out_enabled, audio->drv_status);
 	if (audio->out_enabled) {
@@ -232,6 +257,10 @@ static void audlpa_async_flush(struct audio *audio)
 static int audio_disable(struct audio *audio)
 {
 	int rc = 0;
+	
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audio_disable\n");
+	#endif
 
 	pr_debug("%s:%d %d\n", __func__, audio->opened, audio->out_enabled);
 
@@ -252,6 +281,9 @@ static int audio_disable(struct audio *audio)
 static int audlpa_pause(struct audio *audio)
 {
 	int rc = 0;
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_pause\n");
+	#endif
 
 	pr_debug("%s, enabled = %d\n", __func__,
 			audio->out_enabled);
@@ -272,6 +304,10 @@ static void audlpa_async_send_data(struct audio *audio, unsigned needed,
 	unsigned long flags;
 	struct audio_client *ac;
 	int rc = 0;
+
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_async_send_data\n");
+	#endif
 
 	pr_debug("%s:\n", __func__);
 	spin_lock_irqsave(&audio->dsp_lock, flags);
@@ -341,6 +377,9 @@ static void audlpa_async_send_data(struct audio *audio, unsigned needed,
 static int audlpa_events_pending(struct audio *audio)
 {
 	int empty;
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_events_pending\n");
+	#endif
 
 	spin_lock(&audio->event_queue_lock);
 	empty = !list_empty(&audio->event_queue);
@@ -353,6 +392,10 @@ static void audlpa_reset_event_queue(struct audio *audio)
 	struct audlpa_event *drv_evt;
 	struct list_head *ptr, *next;
 
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_reset_event_queue\n");
+	#endif
+	
 	spin_lock(&audio->event_queue_lock);
 	list_for_each_safe(ptr, next, &audio->event_queue) {
 		drv_evt = list_first_entry(&audio->event_queue,
@@ -378,6 +421,10 @@ static long audlpa_process_event_req(struct audio *audio, void __user *arg)
 	struct audlpa_event *drv_evt = NULL;
 	int timeout;
 
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_process_event_req\n");
+	#endif
+	
 	if (copy_from_user(&usr_evt, arg, sizeof(struct msm_audio_event)))
 		return -EFAULT;
 
@@ -438,6 +485,10 @@ static int audlpa_pmem_check(struct audio *audio,
 	struct audlpa_pmem_region *region_elt;
 	struct audlpa_pmem_region t = { .vaddr = vaddr, .len = len };
 
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_pmem_check\n");
+	#endif
+	
 	list_for_each_entry(region_elt, &audio->pmem_region_queue, list) {
 		if (CONTAINS(region_elt, &t) || CONTAINS(&t, region_elt) ||
 		    OVERLAPS(region_elt, &t)) {
@@ -463,6 +514,10 @@ static int audlpa_pmem_add(struct audio *audio,
 	struct audlpa_pmem_region *region;
 	int rc = -EINVAL;
 
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_pmem_add\n");
+	#endif
+	
 	pr_debug("%s:\n", __func__);
 	region = kmalloc(sizeof(*region), GFP_KERNEL);
 
@@ -507,7 +562,10 @@ static int audlpa_pmem_remove(struct audio *audio,
 	struct audlpa_pmem_region *region;
 	struct list_head *ptr, *next;
 	int rc = -EINVAL;
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_pmem_remove\n");
+	#endif
+	
 	list_for_each_safe(ptr, next, &audio->pmem_region_queue) {
 		region = list_entry(ptr, struct audlpa_pmem_region, list);
 
@@ -539,10 +597,12 @@ static int audlpa_pmem_lookup_vaddr(struct audio *audio, void *addr,
 		     unsigned long len, struct audlpa_pmem_region **region)
 {
 	struct audlpa_pmem_region *region_elt;
-
+	
 	int match_count = 0;
-
 	*region = NULL;
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_pmem_lookup_vaddr\n");
+	#endif
 
 	/* returns physical address or zero */
 	list_for_each_entry(region_elt, &audio->pmem_region_queue,
@@ -583,6 +643,9 @@ unsigned long audlpa_pmem_fixup(struct audio *audio, void *addr,
 	struct audlpa_pmem_region *region;
 	unsigned long paddr;
 	int ret;
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_pmem_fixup\n");
+	#endif
 
 	ret = audlpa_pmem_lookup_vaddr(audio, addr, len, &region);
 	if (ret) {
@@ -604,6 +667,10 @@ static int audlpa_aio_buf_add(struct audio *audio, unsigned dir,
 	struct audlpa_buffer_node *buf_node;
 
 	buf_node = kmalloc(sizeof(*buf_node), GFP_KERNEL);
+
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_aio_buf_add\n");
+	#endif
 
 	if (!buf_node)
 		return -ENOMEM;
@@ -638,6 +705,11 @@ static int audlpa_aio_buf_add(struct audio *audio, unsigned dir,
 static int config(struct audio *audio)
 {
 	int rc = 0;
+
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] config\n");
+	#endif
+
 	if (!audio->out_prefill) {
 		if (audio->codec_ops.set_params != NULL) {
 			rc = audio->codec_ops.set_params(audio);
@@ -651,6 +723,10 @@ void q6_audlpa_out_cb(uint32_t opcode, uint32_t token,
 			uint32_t *payload, void *priv)
 {
 	struct audio *audio = (struct audio *) priv;
+
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] q6_audlpa_out_cb\n");
+	#endif
 
 	switch (opcode) {
 	case ASM_DATA_EVENT_WRITE_DONE:
@@ -676,6 +752,10 @@ void q6_audlpa_out_cb(uint32_t opcode, uint32_t token,
 
 static long pcm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] pcm_ioctl\n");
+	#endif
+
 	pr_debug("%s: cmd = %d\n", __func__, cmd);
 	return -EINVAL;
 }
@@ -684,6 +764,10 @@ static int audlpa_set_pcm_params(void *data)
 {
 	struct audio *audio = (struct audio *)data;
 	int rc;
+
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_set_pcm_params\n");
+	#endif
 
 	rc = q6asm_media_format_block_pcm(audio->ac, audio->out_sample_rate,
 					audio->out_channel_mode);
@@ -698,6 +782,10 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	int rc = -EINVAL;
 	uint64_t timestamp;
 	uint64_t temp;
+
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audio_ioctl\n");
+	#endif
 
 	pr_debug("%s: audio_ioctl() cmd = %d\n", __func__, cmd);
 
@@ -964,7 +1052,11 @@ fail:
 int audlpa_async_fsync(struct audio *audio)
 {
 	int rc = 0;
-
+	
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_async_fsync\n");
+	#endif
+	
 	pr_info("%s:Session %d\n", __func__, audio->ac->session);
 
 	/* Blocking client sends more data */
@@ -1031,7 +1123,9 @@ done:
 int audlpa_fsync(struct file *file, int datasync)
 {
 	struct audio *audio = file->private_data;
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_fsync\n");
+	#endif
 	return audlpa_async_fsync(audio);
 }
 
@@ -1039,7 +1133,9 @@ static void audlpa_reset_pmem_region(struct audio *audio)
 {
 	struct audlpa_pmem_region *region;
 	struct list_head *ptr, *next;
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_reset_pmem_region\n");
+	#endif
 	list_for_each_safe(ptr, next, &audio->pmem_region_queue) {
 		region = list_entry(ptr, struct audlpa_pmem_region, list);
 		list_del(&region->list);
@@ -1055,7 +1151,9 @@ static void audlpa_unmap_pmem_region(struct audio *audio)
 	struct audlpa_pmem_region *region;
 	struct list_head *ptr, *next;
 	int rc = -EINVAL;
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_unmap_pmem_region\n");
+	#endif
 	pr_debug("%s:\n", __func__);
 	list_for_each_safe(ptr, next, &audio->pmem_region_queue) {
 		region = list_entry(ptr, struct audlpa_pmem_region, list);
@@ -1075,7 +1173,9 @@ static int audio_release(struct inode *inode, struct file *file)
 
 	pr_info("%s: audio instance 0x%08x freeing, session %d\n", __func__,
 		(int)audio, audio->ac->session);
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audio_release\n");
+	#endif
 	mutex_lock(&audio->lock);
 	audio->wflush = 1;
 	if (audio->out_enabled)
@@ -1115,7 +1215,9 @@ static void audlpa_post_event(struct audio *audio, int type,
 	union msm_audio_event_payload payload)
 {
 	struct audlpa_event *e_node = NULL;
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_post_event\n");
+	#endif
 	spin_lock(&audio->event_queue_lock);
 
 	pr_debug("%s:\n", __func__);
@@ -1145,7 +1247,9 @@ static void audlpa_suspend(struct early_suspend *h)
 	struct audlpa_suspend_ctl *ctl =
 		container_of(h, struct audlpa_suspend_ctl, node);
 	union msm_audio_event_payload payload;
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_suspend\n");
+	#endif
 	pr_debug("%s:\n", __func__);
 	audlpa_post_event(ctl->audio, AUDIO_EVENT_SUSPEND, payload);
 }
@@ -1155,7 +1259,9 @@ static void audlpa_resume(struct early_suspend *h)
 	struct audlpa_suspend_ctl *ctl =
 		container_of(h, struct audlpa_suspend_ctl, node);
 	union msm_audio_event_payload payload;
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_resume\n");
+	#endif
 	pr_debug("%s:\n", __func__);
 	audlpa_post_event(ctl->audio, AUDIO_EVENT_RESUME, payload);
 }
@@ -1164,6 +1270,9 @@ static void audlpa_resume(struct early_suspend *h)
 #ifdef CONFIG_DEBUG_FS
 static ssize_t audlpa_debug_open(struct inode *inode, struct file *file)
 {
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_debug_open\n");
+	#endif
 	file->private_data = inode->i_private;
 	return 0;
 }
@@ -1175,7 +1284,9 @@ static ssize_t audlpa_debug_read(struct file *file, char __user *buf,
 	static char buffer[4096];
 	int n = 0;
 	struct audio *audio = file->private_data;
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_debug_read\n");
+	#endif
 	mutex_lock(&audio->lock);
 	n = scnprintf(buffer, debug_bufmax, "opened %d\n", audio->opened);
 	n += scnprintf(buffer + n, debug_bufmax - n,
@@ -1216,12 +1327,17 @@ static int audio_open(struct inode *inode, struct file *file)
 	struct audio *audio = NULL;
 	int rc, i, dec_attrb = 0;
 	struct audlpa_event *e_node = NULL;
+	
 #ifdef CONFIG_DEBUG_FS
 	/* 4 bytes represents decoder number, 1 byte for terminate string */
 	char name[sizeof "msm_lpa_" + 5];
 #endif
 	char wake_lock_name[24];
 
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audio_open\n");
+	#endif
+	
 	/* Allocate audio instance, set to zero */
 	audio = kzalloc(sizeof(struct audio), GFP_KERNEL);
 	if (!audio) {
@@ -1369,7 +1485,9 @@ static void audlpa_create(struct audlpa_device *adev, const char *name,
 {
 	struct device *dev;
 	int rc;
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audlpa_create\n");
+	#endif
 	dev = device_create(audlpa_class, parent, devt, "%s", name);
 	if (IS_ERR(dev))
 		return;
@@ -1390,7 +1508,9 @@ static int __init audio_init(void)
 {
 	int rc;
 	int n = ARRAY_SIZE(audlpa_decs);
-
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audio_init\n");
+	#endif
 	audlpa_devices = kzalloc(sizeof(struct audlpa_device) * n, GFP_KERNEL);
 	if (!audlpa_devices)
 		return -ENOMEM;
@@ -1421,6 +1541,9 @@ fail_create_class:
 
 static void __exit audio_exit(void)
 {
+	#ifdef FUNCTION_TRACE
+	printk("[woohyun.seok] audio_exit\n");
+	#endif
 	class_unregister(audlpa_class);
 	kfree(audlpa_devices);
 }

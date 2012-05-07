@@ -2952,7 +2952,7 @@ static void vfe31_process_zsl_frame(uint32_t ping_pong)
 
 static void vfe31_process_output_path_irq_1(uint32_t ping_pong)
 {
-	pr_info("%s, operation_mode = %d, cap_cnt = %d\n", __func__,
+	CDBG("%s, operation_mode = %d, cap_cnt = %d\n", __func__,
 		vfe31_ctrl->operation_mode, vfe31_ctrl->vfe_capture_count);
 
 	/* In Snapshot mode */
@@ -2960,8 +2960,6 @@ static void vfe31_process_output_path_irq_1(uint32_t ping_pong)
 		&& ((vfe31_ctrl->vfe_capture_count <= 1)
 		|| (vfe31_free_buf_available(vfe31_ctrl->outpath.out0) &&
 		vfe31_free_buf_available(vfe31_ctrl->outpath.out1)))) {
-		pr_info("__debug: Got snapshot frame!\n"); // ADD THIS LINE 
-		
 		vfe31_process_snapshot_frame(ping_pong);
 	} else if ((VFE_MODE_OF_OPERATION_RAW_SNAPSHOT ==
 		vfe31_ctrl->operation_mode) &&

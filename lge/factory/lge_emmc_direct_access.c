@@ -35,7 +35,7 @@
 
 #include <lg_backup_items.h>
 #include <linux/slab.h>
-
+#include <linux/vmalloc.h>
 //[START] VOLD_SUPPORT_CRYPT
 #include <linux/kmod.h>
 //[END] VOLD_SUPPORT_CRYPT
@@ -44,7 +44,6 @@
 #include "lg_diag_cfg.h"
 // LG_FW : 2011.07.06 moon.yongho -----------------------------------------------------]]
 
-#include <linux/fs.h>
 /* Some useful define used to access the MBR/EBR table */
 //#define BLOCK_SIZE                0x200
 #define TABLE_ENTRY_0             0x1BE
@@ -94,7 +93,9 @@
 // END: 0010090 sehyuny.kim@lge.com 2010-10-21
 
 
-typedef struct MmcPartition MmcPartition;
+
+
+
 
 static unsigned ext3_count = 0;
 
@@ -112,7 +113,7 @@ static char *vfat_partitions[] = {"modem", "NONE"};
 
 
 
-struct MmcPartition {
+typedef struct  {
     char *device_index;
     char *filesystem;
     char *name;
@@ -120,7 +121,8 @@ struct MmcPartition {
     unsigned dtype ;
     unsigned dfirstsec;
     unsigned dsize;
-};
+}MmcPartition;
+
 
 typedef struct {
     MmcPartition *partitions;
@@ -162,7 +164,6 @@ struct __eri_data {
 };
 static struct __eri_data eri_dload_data;
 
-
 //DID BACKUP
 static struct workqueue_struct *did_dload_wq;
 struct __did_data {
@@ -176,27 +177,13 @@ static void did_dload_func(struct work_struct *work);
 //#endif
 /* END: 0013860 jihoon.lee@lge.com 20110111 */
 
-
-//[START] VOLD_SUPPORT_CRYPT
-static struct workqueue_struct *cryptfs_cmd_wq;
-struct __cryptfs_cmd_data {
-    unsigned long cmd;
-    struct work_struct work;
-};
-static struct __cryptfs_cmd_data cryptfs_cmd_data;
-
-static void cryptfs_cmd_func(struct work_struct *work);
-//[END] VOLD_SUPPORT_CRYPT
-
 int lge_erase_block(int secnum, size_t size);
 int lge_write_block(unsigned int secnum, unsigned char *buf, size_t size);
 int lge_read_block(unsigned int secnum, unsigned char *buf, size_t size);
 
 
 static int dummy_arg;
-
 int boot_info = 0;
-
 //[START] LGE_BOOTCOMPLETE_INFO
 //2011.07.21 jihoon.lee change module_param to module_param_call to see the log
 static int boot_info_write(const char *val, struct kernel_param *kp)
@@ -208,13 +195,14 @@ static int boot_info_write(const char *val, struct kernel_param *kp)
 		printk(KERN_ERR "%s, NULL buf\n", __func__);
 		return -1;
 	}
-
+	
 	flag = simple_strtoul(val,NULL,10);
 	boot_info = (int)flag;
 	printk(KERN_INFO "%s, flag : %d\n", __func__, boot_info);
 
 
-    queue_work(did_dload_wq, &did_dload_data.work); //DID BACKUP support to DLOD Mode
+//DID BACKUP support to DLOD Mode
+	queue_work(did_dload_wq, &did_dload_data.work);
 //
 	return 0;
 }
@@ -222,21 +210,6 @@ static int boot_info_write(const char *val, struct kernel_param *kp)
 //module_param(boot_info, int, S_IWUSR | S_IRUGO);
 module_param_call(boot_info, boot_info_write, param_get_int, &boot_info, S_IWUSR | S_IRUGO);
 //[END] LGE_BOOTCOMPLETE_INFO
-
-int lg_manual_test_mode = 0;
-int manual_test_mode =0;
-extern int msm_get_manual_test_mode(void);
-
-static int android_get_manual_test_mode(char *buffer, struct kernel_param *kp)
-{
-	int ret;
-    lg_manual_test_mode = msm_get_manual_test_mode();
-    printk(KERN_ERR "[%s] get manual test mode - %d\n", __func__, lg_manual_test_mode);
-	ret = sprintf(buffer, "%d", lg_manual_test_mode);
-	return ret;
-}
-
-module_param_call(manual_test_mode, NULL, android_get_manual_test_mode, &manual_test_mode, 0444);
 
 int db_integrity_ready = 0;
 module_param(db_integrity_ready, int, S_IWUSR | S_IRUGO);
@@ -249,18 +222,19 @@ module_param(file_crc_ready, int, S_IWUSR | S_IRUGO);
 
 int db_dump_ready = 0;
 module_param(db_dump_ready, int, S_IWUSR | S_IRUGO);
-
-int db_copy_ready = 0;
+int db_copy_ready = 0;	
 module_param(db_copy_ready, int, S_IWUSR | S_IRUGO);
+int code_partition_crc_ready = 0;
+module_param(code_partition_crc_ready, int, S_IWUSR | S_IRUGO);
 
 int external_memory_test = 0;
 module_param(external_memory_test, int, S_IWUSR | S_IRUGO);
-
+int fota_id_check = 0;
+module_param(fota_id_check, int, S_IWUSR | S_IRUGO);
 unsigned char fota_id_read[20] = "0";
 module_param_string(fota_id_read, fota_id_read, 20, S_IWUSR | S_IRUGO);
-
-int testmode_result = 0;
-module_param(testmode_result, int, S_IWUSR | S_IRUGO);
+int total_crc_ready = 0;	
+module_param(total_crc_ready, int, S_IWUSR | S_IRUGO);
 
 testmode_rsp_from_diag_type integrity_ret;
 static int integrity_ret_write(const char *val, struct kernel_param *kp)
@@ -280,31 +254,14 @@ module_param_call(integrity_ret, integrity_ret_write, integrity_ret_read, &dummy
 static int eri_write(const char *val, struct kernel_param *kp)
 {
 	mm_segment_t oldfs;
-	//int read;
+	int read;
 	unsigned long flag = 5;
-	struct file *phMscd_Filp = NULL;
-	unsigned int file_position = 0;
-	
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
-	//read = sys_open((const char __user *)ERI_FILE_PATH, O_RDONLY , 0);
-	phMscd_Filp = filp_open(ERI_FILE_PATH, O_RDONLY, 0);
-	if(IS_ERR(phMscd_Filp)){
-		printk(KERN_INFO "%s not found\n", ERI_FILE_PATH);
-		file_position = 0;
-	}
-	else{
-		phMscd_Filp->f_pos = 0;
-		file_position = (unsigned int)phMscd_Filp->f_op->llseek(phMscd_Filp, phMscd_Filp->f_pos, SEEK_END);
-		printk(KERN_INFO "%s size : %d\n", ERI_FILE_PATH, file_position);
-		filp_close(phMscd_Filp,NULL);
-	}	
+	read = sys_open((const char __user *)ERI_FILE_PATH, O_RDONLY , 0);
 
-	set_fs(oldfs);
-
-	// prevent 0 byte eri file generation, check its size as well
-	if(file_position <= 4){
+	if(read < 0) {
 		printk(KERN_INFO "%s, received flag : %ld, activate work queue\n", __func__, flag);
 		eri_dload_data.flag = flag;
 		queue_work(eri_dload_wq, &eri_dload_data.work);
@@ -313,8 +270,8 @@ static int eri_write(const char *val, struct kernel_param *kp)
 		printk(KERN_INFO "%s, already saved eri.bin\n",__func__);
 	}
 
-	//set_fs(oldfs);
-	//sys_close(read);
+	set_fs(oldfs);
+	sys_close(read);
 	return 0;
 }
 module_param_call(eri_info, eri_write, param_get_int, &dummy_arg, S_IWUSR | S_IRUGO);
@@ -362,12 +319,7 @@ static int rooting_nv_write(const char *val, struct kernel_param *kp)
 	remote_rpc_rooting_nv_cmmand( 0) ;	
 	}
 	
-
-	
-	#endif 
-	
-	
-
+#endif
 return (int)flag;	 
 }
 static int rooting_nv_read(char *buf, struct kernel_param *kp)
@@ -421,16 +373,8 @@ static int send_cryptfs_cmd(int cmd)
 		printk(KERN_ERR "%s failed to run \": %i\n",__func__, ret);
 	}
 	else
-		printk(KERN_INFO "%s execute ok\n", __func__);
+		printk(KERN_INFO "%s execute ok", __func__);
 	return ret;
-}
-
-static void
-cryptfs_cmd_func(struct work_struct *work)
-{
-	printk(KERN_INFO "%s, cmd : %ld\n", __func__, cryptfs_cmd_data.cmd);	
-	send_cryptfs_cmd((int)cryptfs_cmd_data.cmd);
-	return;
 }
 
 static int cryptfs_cmd_write(const char *val, struct kernel_param *kp)
@@ -444,19 +388,13 @@ static int cryptfs_cmd_write(const char *val, struct kernel_param *kp)
 	}
 	
 	cmd = simple_strtoul(val,NULL,10);
-
-	// send the command to the workqueue and return this write command response asap
-	// this will prevent ANR in the userspace call
-	printk(KERN_INFO "%s, received cmd : %ld, activate work queue\n", __func__, cmd);
-	cryptfs_cmd_data.cmd = cmd;
-	queue_work(cryptfs_cmd_wq, &cryptfs_cmd_data.work);
 	
-	return 0;
+	return send_cryptfs_cmd((int)cmd);
 }
 
 module_param_call(cryptfs_cmd, cryptfs_cmd_write, NULL, NULL, S_IWUSR | S_IRUGO);
 //[END] VOLD_SUPPORT_CRYPT
-
+	
 static char *lge_strdup(const char *str)
 {
 	size_t len;
@@ -473,20 +411,58 @@ static char *lge_strdup(const char *str)
 int lge_erase_block(int bytes_pos, size_t erase_size)
 {
 	unsigned char *erasebuf;
-	unsigned written = 0;
-	erasebuf = kmalloc(erase_size, GFP_KERNEL);
-	// allocation exception handling
+	size_t r_erasebuf = 0;
+	unsigned int written = 0;
+	unsigned int written_out = 0;
+	int erasebuf_cnt = 0;
+	int index = 0;
+	size_t erasebuf_size=8192; //8KB
+
+	erasebuf_cnt = (int) (erase_size / erasebuf_size);
+	r_erasebuf = erase_size % erasebuf_size;
+	erasebuf = kmalloc(erasebuf_size, GFP_KERNEL);	
 	if(!erasebuf)
 	{
-		printk("%s, allocation failed, expected size : %d\n", __func__, erase_size);
+		printk("%s, allocation failed at fixed erasebuf, expected size : %d\n", __func__, erasebuf_size);
 		return 0;
 	}
-	memset(erasebuf, 0xff, erase_size);
-	written += lge_write_block(bytes_pos, erasebuf, erase_size);
-
+	memset(erasebuf, 0xff, erasebuf_size);
+	for(index =0; index < erasebuf_cnt;index++)
+	{
+		written_out = lge_write_block(bytes_pos, erasebuf, erasebuf_size);
+		if(written_out > 0)
+		{
+			written += written_out;
+		}
+		else
+		{
+			printk("lge_write_block fail postition at %d\n",bytes_pos);
+		}
+		bytes_pos+=erasebuf_size;
+	}
 	kfree(erasebuf);
-
+	
+	if (r_erasebuf){
+		erasebuf = kmalloc(r_erasebuf, GFP_KERNEL);
+		if(!erasebuf)
+		{
+			printk("%s, allocation failed at remainder erasebuf, expected size : %d\n", __func__, r_erasebuf);
+			return 0;
+		}
+		memset(erasebuf, 0xff, r_erasebuf);
+		written_out = lge_write_block(bytes_pos, erasebuf, erase_size);
+		if(written_out > 0)
+		{
+			written += written_out;
+		}
+		else
+		{
+			printk("lge_write_block remain  fail postition at %d\n",bytes_pos);
+		}
+		kfree(erasebuf);			
+	}
 	return written;
+		
 }
 EXPORT_SYMBOL(lge_erase_block);
 
@@ -495,9 +471,12 @@ EXPORT_SYMBOL(lge_erase_block);
 int lge_write_block(unsigned int bytes_pos, unsigned char *buf, size_t size)
 {
 	struct file *phMscd_Filp = NULL;
-	mm_segment_t old_fs;
-	unsigned int write_bytes = 0;
-
+	mm_segment_t old_fs;	
+	int write_fail_flag = 0;
+	unsigned int write_bytes;
+	write_retry:	
+	write_bytes = 0;
+	
 	// exception handling
 	if((buf == NULL) || size <= 0)
 	{
@@ -514,6 +493,7 @@ int lge_write_block(unsigned int bytes_pos, unsigned char *buf, size_t size)
 	if( !phMscd_Filp)
 	{
 		printk(KERN_ERR "%s, Can not access 0x%x bytes postition\n", __func__, bytes_pos );
+		write_fail_flag++;
 		goto write_fail;
 	}
 
@@ -523,13 +503,20 @@ int lge_write_block(unsigned int bytes_pos, unsigned char *buf, size_t size)
 	if(write_bytes <= 0)
 	{
 		printk(KERN_ERR "%s, Can not write 0x%x bytes postition %d size \n", __func__, bytes_pos, size);
+		write_fail_flag++;
 		goto write_fail;
 	}
 
 write_fail:
+	
 	if(phMscd_Filp != NULL)
 		filp_close(phMscd_Filp,NULL);
 	set_fs(old_fs); 
+	if ((write_fail_flag < 4) && write_fail_flag != 0){
+		lge_erase_block(bytes_pos,size);
+		goto write_retry;
+	}
+	
 	return write_bytes;
 	
 }
@@ -887,7 +874,7 @@ static int test_write_block(const char *val, struct kernel_param *kp)
 	int err;
 	//int normal_block_seq = 0;
 	int mtd_op_result = 0;
-	const MmcPartition *pMisc_part;
+	const MmcPartition *pMisc_part; 
 	unsigned long factoryreset_bytes_pos_in_emmc = 0;
 	unsigned long flag=0;
 
@@ -900,9 +887,9 @@ static int test_write_block(const char *val, struct kernel_param *kp)
 		printk(KERN_ERR "allocation failed, return\n");
 		return 0;
 	}
-
+	
 	printk(KERN_INFO"write block1\n");
-
+	
 	flag = simple_strtoul(val,NULL,10);
 //	if (flag == 5 || flag == 6 )
 //	{
@@ -916,15 +903,16 @@ static int test_write_block(const char *val, struct kernel_param *kp)
 //		kfree(test_string);
 //		return -1;
 //	}
-
+	
 	lge_mmc_scan_partitions();
 	pMisc_part = lge_mmc_find_partition_by_name("misc");
 	if ( pMisc_part == NULL )
 	{
+	
 		printk(KERN_INFO"NO MISC\n");
 		return 0;
 	}
-
+	
 	factoryreset_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512)+PTN_FRST_PERSIST_POSITION_IN_MISC_PARTITION;
 
 
@@ -934,7 +922,7 @@ static int test_write_block(const char *val, struct kernel_param *kp)
 	mtd_op_result = lge_write_block(factoryreset_bytes_pos_in_emmc, test_string, FACTORY_RESET_STR_SIZE+2);
 	if ( mtd_op_result != (FACTORY_RESET_STR_SIZE+2) ) {
 		printk(KERN_INFO"%s: write %u block fail\n", __func__, i);
-		kfree(test_string);
+		kfree(test_string);		
 		return err;
 	}
 
@@ -962,18 +950,19 @@ static int test_read_block( char *buf, struct kernel_param *kp)
 	//int i;
 	int err=0;
 	int mtd_op_result = 0;
-
-	const MmcPartition *pMisc_part;
+	
+	const MmcPartition *pMisc_part; 
 	unsigned long factoryreset_bytes_pos_in_emmc = 0;
-
+	
 	printk(KERN_INFO"read block1\n");
-
+	
 	lge_mmc_scan_partitions();
 //	lge_mmc_partition_initialied = 4;
-
+	
 	pMisc_part = lge_mmc_find_partition_by_name("misc");
 	if ( pMisc_part == NULL )
 	{
+	
 		printk(KERN_INFO"NO MISC\n");
 		return 0;
 	}
@@ -986,7 +975,7 @@ static int test_read_block( char *buf, struct kernel_param *kp)
 
 	mtd_op_result = lge_read_block(factoryreset_bytes_pos_in_emmc, global_buf, FACTORY_RESET_STR_SIZE+2);
 //	lge_mmc_partition_initialied = 7;
-
+	
 	if (mtd_op_result != (FACTORY_RESET_STR_SIZE+2) ) {
 		printk(KERN_INFO" read %ld block fail\n", factoryreset_bytes_pos_in_emmc);
 		return err;
@@ -1012,6 +1001,7 @@ static int test_read_block( char *buf, struct kernel_param *kp)
 }
 module_param_call(read_block, param_set_bool, test_read_block, &dummy_arg, S_IWUSR | S_IRUGO);
 
+//module_param_call(read_block,  test_read_block, param_get_bool,&dummy_arg, S_IWUSR | S_IRUGO);
 //#ifndef CONFIG_LGE_ERI_DOWNLOAD
 extern void remote_did_rpc(void);
 static void
@@ -1026,13 +1016,10 @@ did_dload_func(struct work_struct *work)
 }
 //#endif
 
-
-
 /* BEGIN: 0013860 jihoon.lee@lge.com 20110111 */
 /* ADD 0013860: [FACTORY RESET] ERI file save */
-
-
 //#ifndef CONFIG_LGE_ERI_DOWNLOAD
+
 static void
 eri_dload_func(struct work_struct *work)
 {
@@ -1045,64 +1032,6 @@ eri_dload_func(struct work_struct *work)
 }
 //#endif
 /* END: 0013860 jihoon.lee@lge.com 20110111 */
-
-
-
-/* BEGIN: ys.seong@lge.com 20110813 */
-/* ADD 0013860: [FOTA] bootcmd save */
-#define BOOTCMD_FLAG_OFFSET_IN_BYTES 0x780000  //7.5MB 
-struct bootloader_message {
-    char command[32];
-    char status[32];
-//    char recovery[1024];
-	char recovery[128]; //ys.seong reduce size for avoid stackoverflow from original size
-};
-static int test_bootcmd_write_block(const char *val, struct kernel_param *kp)
-{
-
-	int i = 0;
-	int err;
-	int mtd_op_result = 0;
-	const MmcPartition *pMisc_part; 
-	unsigned long bootcmd_bytes_pos_in_emmc = 0;
-	struct bootloader_message boot;
-
-    memset(&boot, 0, sizeof(boot));
-
-	strlcpy(boot.command, "boot-recovery", sizeof(boot.command));
-	strlcpy(boot.recovery, "recovery\n", sizeof(boot.recovery));
-	
-	printk(KERN_INFO"bootcmd write block\n");
-	
-	lge_mmc_scan_partitions();
-	pMisc_part = lge_mmc_find_partition_by_name("misc");
-	if ( pMisc_part == NULL )
-	{
-	
-		printk(KERN_INFO"NO MISC\n");
-		return 0;
-	}
-	
-	bootcmd_bytes_pos_in_emmc = (pMisc_part->dfirstsec*512)+BOOTCMD_FLAG_OFFSET_IN_BYTES;
-
-
-	printk(KERN_INFO"bootcmd writing block\n");
-
-
-	mtd_op_result = lge_write_block(bootcmd_bytes_pos_in_emmc, (void *)&boot, sizeof(boot));
-	if ( mtd_op_result != sizeof(boot) ) {
-		printk(KERN_INFO"bootcmd %s: write %u block fail\n", __func__, i);
-		return err;
-	}
-
-
-	printk(KERN_INFO"bootcmd write %d block\n", i);
-	return 0;
-}
-module_param_call(bootcmd_write_block, test_bootcmd_write_block, param_get_bool, &dummy_arg, S_IWUSR | S_IRUGO);
-
-/* END: ys.seong@lge.com 20110813  */
-
 
 static int __init lge_emmc_direct_access_init(void)
 {
@@ -1121,12 +1050,6 @@ static int __init lge_emmc_direct_access_init(void)
 	did_dload_wq = create_singlethread_workqueue("did_dload_wq");
 	INIT_WORK(&did_dload_data.work, did_dload_func);
 //#endif
-
-//[START] VOLD_SUPPORT_CRYPT
-	cryptfs_cmd_wq = create_singlethread_workqueue("cryptfs_cmd_wq");
-	INIT_WORK(&cryptfs_cmd_data.work, cryptfs_cmd_func);
-//[END] VOLD_SUPPORT_CRYPT
-
 	return 0;
 }
 

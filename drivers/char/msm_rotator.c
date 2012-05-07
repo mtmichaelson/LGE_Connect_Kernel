@@ -1000,6 +1000,18 @@ static int msm_rotator_start(unsigned long arg, int pid)
 	if (copy_from_user(&info, (void __user *)arg, sizeof(info)))
 		return -EFAULT;
 
+//qct workaround code... start
+        if((info.rotations & MDP_ROT_90) && ((info.dst_y + info.src_rect.w) > info.dst.height)) { 
+             if(info.src_rect.w == info.dst.width && info.dst.height == info.src_rect.h && info.dst_y == 0 && info.dst_x == 0 )
+            { 
+                uint32_t temp = info.dst.height; 
+                info.dst.height = info.dst.width; 
+                info.dst.width = temp; 
+            } 
+        } 
+ //qct workaround code... end
+
+
 	if ((info.rotations > MSM_ROTATOR_MAX_ROT) ||
 	    (info.src.height > MSM_ROTATOR_MAX_H) ||
 	    (info.src.width > MSM_ROTATOR_MAX_W) ||

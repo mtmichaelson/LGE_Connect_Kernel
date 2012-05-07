@@ -12,8 +12,8 @@
 
 #include <linux/types.h>
 
-#include "SiI9244_I2C_master.h"
-#include "SiI9244_I2C_slave_add.h"
+#include "SiI9234_I2C_master.h"
+#include "SiI9234_I2C_slave_add.h"
 
 
 static byte l_cbusPortOffsets [ MHD_MAX_CHANNELS ] = { 0x00 };

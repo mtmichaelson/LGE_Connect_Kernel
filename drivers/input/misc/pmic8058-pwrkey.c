@@ -63,6 +63,8 @@ static enum hrtimer_restart pmic8058_pwrkey_timer(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
+extern int lgf_key_lock;
+
 static irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
 {
 	struct pmic8058_pwrkey *pwrkey = _pwrkey;
@@ -89,9 +91,12 @@ static irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
 			return IRQ_HANDLED;
 		}
 
+		if(lgf_key_lock != 0x55){
+		printk("Power Key Pressed!");
 		input_report_key(pwrkey->pwr, KEY_END, 1);
 		input_sync(pwrkey->pwr);
-
+		}
+		
 		hrtimer_start(&pwrkey->timer,
 				ktime_set(pdata->pwrkey_time_ms / 1000,
 				(pdata->pwrkey_time_ms % 1000) * 1000000),
@@ -125,9 +130,11 @@ static irqreturn_t pwrkey_release_irq(int irq, void *_pwrkey)
 			input_report_key(pwrkey->pwr, KEY_POWER, 0);
 			input_sync(pwrkey->pwr);
 		}
-
+		if(lgf_key_lock != 0x55){
+		printk("Power Key Release!\n");
 		input_report_key(pwrkey->pwr, KEY_END, 0);
-		input_sync(pwrkey->pwr);
+		input_sync(pwrkey->pwr);		
+		}
 	} else {
 		/*
 		 * Set this flag true so that in the subsequent interrupt of
@@ -142,11 +149,14 @@ static irqreturn_t pwrkey_release_irq(int irq, void *_pwrkey)
 			input_sync(pwrkey->pwr);
 			spin_unlock_irqrestore(&pwrkey->lock, flags);
 			return IRQ_HANDLED;
-		}
+		}		
+		if(lgf_key_lock != 0x55){
+		printk("Power Key Release!\n");
 		input_report_key(pwrkey->pwr, KEY_END, 1);
 		input_sync(pwrkey->pwr);
 		input_report_key(pwrkey->pwr, KEY_END, 0);
-		input_sync(pwrkey->pwr);
+		input_sync(pwrkey->pwr);		
+		}
 	}
 	spin_unlock_irqrestore(&pwrkey->lock, flags);
 

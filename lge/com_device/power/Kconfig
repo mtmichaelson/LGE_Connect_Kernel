@@ -168,10 +168,17 @@ config LGE_PM_FACTORY_CURRENT_DOWN
   help
     LGE current down in factory   
 
-config LGE_PM_FACTORY_FUEL_GAUGE
+config LGE_PM_IGNORE_BATT_THERM_FOR_EVENTS
   depends on ARCH_MSM8X60
-  default y
-  bool "LGE PM FACTORY FUEL_GAUGE"
+  default n
+  bool "LGE_PM_IGNORE_BATT_THERM_FOR_EVENTS"
   help
-    LGE SKIP fuel gauge i2c in factory
+	LGE_PM_IGNORE_BATT_THERM_FOR_EVENTS
+
+config LGE_XO_VOTER_FOR_EVDO 
+  depends on ARCH_MSM8X60
+  default n
+  bool "LGE_XO_VOTER_FOR_EVDO"
+  help
+	LGE_PM_IGNORE_BATT_THERM_FOR_EVENTS
 

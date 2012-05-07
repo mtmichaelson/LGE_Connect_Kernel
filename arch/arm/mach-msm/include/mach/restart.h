@@ -32,6 +32,7 @@
 
 #define RESTART_NORMAL 0x0
 #define RESTART_DLOAD  0x1
+
 /* neo.kang@lge.com 2011-06-01
  * add the error handler */
 #if defined(CONFIG_LGE_ERROR_HANDLER)
@@ -41,6 +42,7 @@
 #define SUB_RESET_SOC 0x0130
 #define SUB_UNKNOWN 0x0140
 #endif
+
 
 #if defined(CONFIG_ARCH_MSM8X60)
 void msm_set_restart_mode(int mode);

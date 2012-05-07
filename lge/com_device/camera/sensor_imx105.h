@@ -51,14 +51,6 @@ struct imx105_reg {
 	uint16_t prevtbl_1080_size;
 // End LGE_BSP_CAMERA::john.park@lge.com 2011-04-27  For 1080p
 
-// Start LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com 
-	struct imx105_i2c_reg_conf const *shutter_tbl;
-	uint16_t shuttertbl_size;
-	struct imx105_i2c_reg_conf const *shutter2_tbl;
-	uint16_t shutter2tbl_size;
-	struct imx105_i2c_reg_conf const *shutter2_1080p_tbl;
-	uint16_t shutter2_1080ptbl_size;
-// End LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com 	
 };
 
 

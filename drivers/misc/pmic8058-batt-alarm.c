@@ -102,8 +102,8 @@
  * pm8058_batt_alarm_state_set.
  */
 #ifdef CONFIG_LGE_PM_BATTERY_ALARM
-#define DEFAULT_THRESHOLD_LOWER		3500
-#define DEFAULT_THRESHOLD_UPPER		4350
+#define DEFAULT_THRESHOLD_LOWER		3350
+#define DEFAULT_THRESHOLD_UPPER		4200
 #else
 #define DEFAULT_THRESHOLD_LOWER		3200
 #define DEFAULT_THRESHOLD_UPPER		4300
@@ -120,24 +120,18 @@
 #define DEFAULT_UPPER_ENABLE		0
 #endif
 
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-extern int lge_battery_info;
-#define DEFAULT_THRESHOLD_LOWER_CALC(x)		(3500 - (x*0))
-#define DEFAULT_THRESHOLD_UPPER_CALC(x)		(4350 - (x*150))
-#endif
-
 #ifdef CONFIG_LGE_PM_BATTERY_ALARM
 /* kiwone.seo@lge.com 2011-08-14, bug fix of resume charging and low battery alarm */
-#define AUTO_CHARGING_RESUME_MV_CALC(x) (4250-(x*150))
+#define AUTO_CHARGING_RESUME_MV_CALC	4120
 #endif
 
 #ifdef CONFIG_LGE_PM_BATTERY_ALARM
-#undef LGE_DEBUG
+#define LGE_DEBUG
 
-#define P00_THRESHOLD_LOWER(x)		DEFAULT_THRESHOLD_LOWER_CALC(x)		/* 3500mV */
-#define P01_THRESHOLD_LOWER(x)		P00_THRESHOLD_LOWER(x) + 50	/* 3550mV */
-#define P03_THRESHOLD_LOWER(x)		P01_THRESHOLD_LOWER(x) + 50	/* 3600mV */
-#define P15_THRESHOLD_LOWER(x)		P03_THRESHOLD_LOWER(x) + 50	/* 3650mV */
+#define P00_THRESHOLD_LOWER			3350	/* 3350mV */
+#define P01_THRESHOLD_LOWER			3400	/* 3400mV */
+#define P03_THRESHOLD_LOWER			3500	/* 3500mV */
+#define P15_THRESHOLD_LOWER			3700	/* 3700mV */
 
 struct wake_lock batt_alarm_wake_lock;
 extern int max17040_get_battery_capacity_percent(void);
@@ -244,7 +238,7 @@ int pm8058_batt_alarm_threshold_set(int lower_threshold_mV,
 	int step, fine_step, rc;
 	u8 reg_threshold = 0, reg_ctrl2 = 0;
 
-	//pr_err("%s : lower_threshold_mV = %d, upper_threshold_mV = %d\n", __func__, lower_threshold_mV, upper_threshold_mV);
+	pr_err("%s : lower_threshold_mV = %d, upper_threshold_mV = %d\n", __func__, lower_threshold_mV, upper_threshold_mV);
 	if (!battdev) {
 		pr_err("no battery alarm device found.\n");
 		return -ENXIO;
@@ -692,14 +686,14 @@ static int pm8058_batt_alarm_config(void)
 	if (!is_chg_plugged_in()) {
 		mv = max17040_get_battery_mvolts();
 
-		if (mv > P15_THRESHOLD_LOWER(lge_battery_info))
-			threshold_mv = P15_THRESHOLD_LOWER(lge_battery_info);
-		else if (mv > P03_THRESHOLD_LOWER(lge_battery_info) && mv <= P15_THRESHOLD_LOWER(lge_battery_info))
-			threshold_mv = P03_THRESHOLD_LOWER(lge_battery_info);
-		else if (mv > P01_THRESHOLD_LOWER(lge_battery_info) && mv <= P03_THRESHOLD_LOWER(lge_battery_info))
-			threshold_mv = P01_THRESHOLD_LOWER(lge_battery_info);
+		if (mv > P15_THRESHOLD_LOWER)
+			threshold_mv = P15_THRESHOLD_LOWER;
+		else if (mv > P03_THRESHOLD_LOWER && mv <= P15_THRESHOLD_LOWER)
+			threshold_mv = P03_THRESHOLD_LOWER;
+		else if (mv > P01_THRESHOLD_LOWER && mv <= P03_THRESHOLD_LOWER)
+			threshold_mv = P01_THRESHOLD_LOWER;
 		else
-			threshold_mv = P00_THRESHOLD_LOWER(lge_battery_info);
+			threshold_mv = P00_THRESHOLD_LOWER;
 		rc = pm8058_batt_alarm_threshold_set(threshold_mv,
 			DEFAULT_THRESHOLD_UPPER);
 	}
@@ -708,16 +702,11 @@ static int pm8058_batt_alarm_config(void)
 	/* Use default values when no platform data is provided. */
 #ifdef CONFIG_LGE_PM_BATTERY_ALARM
 /* kiwone.seo@lge.com 2011-08-14, bug fix of resume charging and low battery alarm */
-		rc = pm8058_batt_alarm_threshold_set(AUTO_CHARGING_RESUME_MV_CALC(lge_battery_info), 
-			DEFAULT_THRESHOLD_UPPER_CALC(lge_battery_info));
-#else
-#ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
-	rc = pm8058_batt_alarm_threshold_set(DEFAULT_THRESHOLD_LOWER_CALC(lge_battery_info), 
-		DEFAULT_THRESHOLD_UPPER_CALC(lge_battery_info));
+		rc = pm8058_batt_alarm_threshold_set(AUTO_CHARGING_RESUME_MV_CALC, 
+			DEFAULT_THRESHOLD_UPPER);
 #else
 	rc = pm8058_batt_alarm_threshold_set(DEFAULT_THRESHOLD_LOWER,
 		DEFAULT_THRESHOLD_UPPER);
-#endif
 #endif
 	if (rc) {
 		pr_err("threshold_set failed, rc=%d\n", rc);

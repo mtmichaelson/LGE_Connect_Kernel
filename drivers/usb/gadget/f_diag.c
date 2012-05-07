@@ -124,6 +124,12 @@ struct diag_context {
 	struct usb_composite_dev *cdev;
 	struct usb_diag_platform_data *pdata;
 	struct usb_diag_ch ch;
+// [START] seunghun.kim : for LG_USB_DRIVER 2011.03.25
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+	char *serial_number;
+	unsigned short	product_id;
+#endif
+// [END] seunghun.kim : for LG_USB_DRIVER 2011.03.25
 
 	/* pkt counters */
 	unsigned long dpkts_tolaptop;
@@ -131,6 +137,15 @@ struct diag_context {
 	unsigned dpkts_tolaptop_pending;
 };
 
+// [START] seunghun.kim : for LG_USB_DRIVER 2011.03.25
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+#define MAX_SERIAL_LEN 256
+
+extern char serial_number[MAX_SERIAL_LEN];
+
+static struct diag_context _context;
+#endif
+// [END] seunghun.kim : for LG_USB_DRIVER 2011.03.25
 
 static inline struct diag_context *func_to_dev(struct usb_function *f)
 {
@@ -627,6 +642,11 @@ int diag_function_add(struct usb_configuration *c)
 	dev->function.unbind = diag_function_unbind;
 	dev->function.set_alt = diag_function_set_alt;
 	dev->function.disable = diag_function_disable;
+// [START] seunghun.kim : for LG_USB_DRIVER 2011.03.25
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+	dev->serial_number = serial_number;
+#endif
+// [END] seunghun.kim : for LG_USB_DRIVER 2011.03.25
 	spin_lock_init(&dev->lock);
 	INIT_LIST_HEAD(&dev->read_pool);
 	INIT_LIST_HEAD(&dev->write_pool);
@@ -641,6 +661,16 @@ int diag_function_add(struct usb_configuration *c)
 	return ret;
 }
 
+// [START] seunghun.kim : for LG_USB_DRIVER 2011.03.25
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+void diag_set_serial_number(char *serial_number)
+{
+  struct diag_context *dev = &_context;
+
+  dev->serial_number = serial_number;
+}
+#endif
+// [END] seunghun.kim : for LG_USB_DRIVER 2011.03.25
 
 #if defined(CONFIG_DEBUG_FS)
 static char debug_buffer[PAGE_SIZE];

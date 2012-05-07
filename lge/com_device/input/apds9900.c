@@ -33,14 +33,18 @@
 #include <linux/irq.h>
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
-#include <apds9900.h>
+//#include <apds9900.h>
+
+//seungkwan.jung
+#include <mach/board_lge.h>
+
+
 
 #define APDS9900_DRV_NAME       "apds9900"
 #define DRIVER_VERSION          "1.0.4"
 
-#define APDS9900_USE_MUTEX  
-#define APDS990x_PS_DETECTION_THRESHOLD		600
-#define APDS990x_PS_HSYTERESIS_THRESHOLD	500
+#define APDS990x_PS_DETECTION_THRESHOLD		500
+#define APDS990x_PS_HSYTERESIS_THRESHOLD	400
 
 /* Change History 
  *
@@ -104,11 +108,7 @@
 struct apds9900_data 
 {
     struct i2c_client *client;
-#ifdef APDS9900_USE_MUTEX
-    struct mutex lock;
-#else
 	spinlock_t update_lock;
-#endif
     struct delayed_work poswork;
     struct input_dev *input_dev_proxi;
     struct input_dev *input_dev_light;
@@ -273,10 +273,7 @@ static void apds9900_change_ps_threshold(struct i2c_client *client)
 		data->pilt = data->ps_hysteresis_threshold;
 		data->piht = 1023;
 		
-#ifdef APDS9900_USE_MUTEX
-#else
 		set_irq_wake(data->irq, 1);
-#endif
 		if (apds9900_debug_mask & APDS9900_DEBUG_FUNC_TRACE)
         	DEBUG_MSG("### far-to-near detected\n");		
 	}
@@ -306,10 +303,7 @@ static void apds9900_change_ps_threshold(struct i2c_client *client)
 		data->pilt = 0;
 		data->piht = data->ps_threshold;
 
-#ifdef APDS9900_USE_MUTEX
-#else
 		set_irq_wake(data->irq, 0);
-#endif
 		if (apds9900_debug_mask & APDS9900_DEBUG_FUNC_TRACE)
         	DEBUG_MSG("### near-to-far detected\n");
 	}
@@ -347,10 +341,7 @@ static void apds9900_change_ps_threshold(struct i2c_client *client)
 		data->pilt = data->ps_hysteresis_threshold;
 		data->piht = 1023;
 		
-#ifdef APDS9900_USE_MUTEX
-#else
 		set_irq_wake(data->irq, 0);
-#endif
 		if (apds9900_debug_mask & APDS9900_DEBUG_FUNC_TRACE)
 		{
         	DEBUG_MSG("### near-to-far detected\n");
@@ -391,6 +382,10 @@ static void apds9900_change_ps_threshold(struct i2c_client *client)
 
 	}
 }
+
+#if defined(CONFIG_LGE_KEY_BACKLIGHT_ALC)
+int key_light_luxValue;
+#endif
 
 static void apds9900_change_als_threshold(struct i2c_client *client)
 {
@@ -456,7 +451,11 @@ static void apds9900_change_als_threshold(struct i2c_client *client)
 
     input_report_abs(data->input_dev_light, ABS_LIGHT, luxValue); //report als data
     input_sync(data->input_dev_light);
-    
+
+#if defined(CONFIG_LGE_KEY_BACKLIGHT_ALC)
+	key_light_luxValue = luxValue;
+#endif
+
     data->als_threshold_l = (ch0data * (100 - pdata->als_threshold_hsyteresis)) /100;
     data->als_threshold_h = (ch0data * (100 + pdata->als_threshold_hsyteresis)) /100;
         
@@ -480,12 +479,9 @@ static void apds9900_change_als_threshold(struct i2c_client *client)
 
 static void apds9900_reschedule_work(struct apds9900_data *data, unsigned long delay)
 {
-#ifdef APDS9900_USE_MUTEX
-#else
     unsigned long flags = 0;
     
     spin_lock_irqsave(&data->update_lock, flags);
-#endif
     
   /*
      * If work is already scheduled then subsequent schedules will not
@@ -497,10 +493,7 @@ static void apds9900_reschedule_work(struct apds9900_data *data, unsigned long d
 #else
     schedule_delayed_work(&data->poswork, delay);
 #endif    
-#ifdef APDS9900_USE_MUTEX
-#else
     spin_unlock_irqrestore(&data->update_lock, flags);
-#endif
 }
 
 static void apds9900_event_work(struct work_struct *work)
@@ -511,27 +504,16 @@ static void apds9900_event_work(struct work_struct *work)
 	int irdata=0;
 	int ret = 0;
 	
-#ifdef APDS9900_USE_MUTEX
-    mutex_lock(&data->lock); 
-#endif
     status = i2c_smbus_read_byte_data(client, CMD_BYTE|APDS9900_STATUS_REG);
 	if (status < 0) {
 		dev_err(&client->dev, "%s: i2c error %d in reading reg 0x%x\n", __func__, status, CMD_BYTE|APDS9900_STATUS_REG);
-#ifdef APDS9900_USE_MUTEX
-		goto err_i2c_fail;
-#else
 		return;
-#endif
 	}
 
     ret = i2c_smbus_write_byte_data(client, CMD_BYTE|APDS9900_ENABLE_REG, 1);	/* disable 9900's ADC first */
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: i2c write fail err %d\n", __func__, ret);
-#ifdef APDS9900_USE_MUTEX
-		goto err_i2c_fail;
-#else
 		return;
-#endif
 	}
 
 
@@ -545,11 +527,7 @@ static void apds9900_event_work(struct work_struct *work)
 		if (irdata < 0) {
 			dev_err(&client->dev,
 				"%s: i2c read fail: can't read from %02x: %d\n", __func__, CMD_WORD|APDS9900_IRDATAL_REG, irdata);
-#ifdef APDS9900_USE_MUTEX
-			goto err_i2c_fail;
-#else
 			return;
-#endif
 		} 
 
 		if (irdata != (100*(1024*(256-data->atime)))/100)
@@ -571,20 +549,12 @@ static void apds9900_event_work(struct work_struct *work)
 				ret = i2c_smbus_write_word_data(client, CMD_WORD|APDS9900_PILTL_REG, data->ps_hysteresis_threshold);
 				if (ret < 0) {
 					dev_err(&client->dev, "%s: failed reading register, %d\n", __func__, ret);
-#ifdef APDS9900_USE_MUTEX
-					goto err_i2c_fail;
-#else
 					return;
-#endif
 				}				
 				ret = i2c_smbus_write_word_data(client, CMD_WORD|APDS9900_PIHTL_REG, 1023);
 				if (ret < 0) {
 					dev_err(&client->dev, "%s: failed reading register, %d\n", __func__, ret);
-#ifdef APDS9900_USE_MUTEX
-					goto err_i2c_fail;
-#else
 					return;
-#endif
 				}				
 				data->pilt = data->ps_hysteresis_threshold;
 				data->piht = 1023;
@@ -608,11 +578,7 @@ static void apds9900_event_work(struct work_struct *work)
 		if (irdata < 0) {
 			dev_err(&client->dev,
 				"%s: i2c read fail: can't read from %02x: %d\n", __func__, CMD_WORD|APDS9900_IRDATAL_REG, irdata);
-#ifdef APDS9900_USE_MUTEX
-			goto err_i2c_fail;
-#else
 			return;
-#endif
 		} 		
 		if (irdata != (100*(1024*(256-data->atime)))/100)
 			apds9900_change_ps_threshold(client);
@@ -633,20 +599,12 @@ static void apds9900_event_work(struct work_struct *work)
 				ret = i2c_smbus_write_word_data(client, CMD_WORD|APDS9900_PILTL_REG, data->ps_hysteresis_threshold);
 				if (ret < 0) {
 					dev_err(&client->dev, "%s: failed reading register, %d\n", __func__, ret);
-#ifdef APDS9900_USE_MUTEX
-					goto err_i2c_fail;
-#else
 					return;
-#endif
 				}				
 				ret = i2c_smbus_write_word_data(client, CMD_WORD|APDS9900_PIHTL_REG, 1023);
 				if (ret < 0) {
 					dev_err(&client->dev, "%s: failed reading register, %d\n", __func__, ret);
-#ifdef APDS9900_USE_MUTEX
-					goto err_i2c_fail;
-#else
 					return;
-#endif
 				}				
 				data->pilt = data->ps_hysteresis_threshold;
 				data->piht = 1023;
@@ -673,11 +631,7 @@ static void apds9900_event_work(struct work_struct *work)
 			if (irdata < 0) {
 				dev_err(&client->dev,
 					"%s: i2c read fail: can't read from %02x: %d\n", __func__, CMD_WORD|APDS9900_IRDATAL_REG, irdata);
-#ifdef APDS9900_USE_MUTEX
-				goto err_i2c_fail;
-#else
 				return;
-#endif
 			} 				
 			if (irdata != (100*(1024*(256-data->atime)))/100)
 				apds9900_change_ps_threshold(client);			
@@ -699,20 +653,12 @@ static void apds9900_event_work(struct work_struct *work)
 					ret = i2c_smbus_write_word_data(client, CMD_WORD|APDS9900_PILTL_REG, data->ps_hysteresis_threshold);
 					if (ret < 0) {
 						dev_err(&client->dev, "%s: failed reading register, %d\n", __func__, ret);
-#ifdef APDS9900_USE_MUTEX
-						goto err_i2c_fail;
-#else
 						return;
-#endif
 					}						
 					ret = i2c_smbus_write_word_data(client, CMD_WORD|APDS9900_PIHTL_REG, 1023);
 					if (ret < 0) {
 						dev_err(&client->dev, "%s: failed reading register, %d\n", __func__, ret);
-#ifdef APDS9900_USE_MUTEX
-						goto err_i2c_fail;
-#else
 						return;
-#endif
 					}									
 					data->pilt = data->ps_hysteresis_threshold;
 					data->piht = 1023;
@@ -732,17 +678,8 @@ static void apds9900_event_work(struct work_struct *work)
     ret = i2c_smbus_write_byte_data(client, CMD_BYTE|APDS9900_ENABLE_REG, data->enable);
 	if (ret < 0) {
 		dev_err(&client->dev, "%s: i2c write fail err %d\n", __func__, ret);
-#ifdef APDS9900_USE_MUTEX
-		goto err_i2c_fail;
-#else
 		return;
-#endif
 	}	
-#ifdef APDS9900_USE_MUTEX
-err_i2c_fail:
-	mutex_unlock(&data->lock);
-	return;	
-#endif
 }
 
 /* assume this is ISR */
@@ -961,12 +898,18 @@ static int apds9900_set_enable(struct i2c_client *client, int enable)
             }
 			if(((data->enable &0x20)==0)&&((enable &0x20)==1))
 			{
-                apds9900_set_pilt(client, 1023);	// to force first Near-to-Far interrupt
-                apds9900_set_piht(client, 0);
-                papds9900_data->ps_detection = 1;			// we are forcing Near-to-Far interrupt, so this is defaulted to 1
-                papds9900_data->ps_threshold = APDS990x_PS_DETECTION_THRESHOLD;
-                papds9900_data->ps_hysteresis_threshold = APDS990x_PS_HSYTERESIS_THRESHOLD;
-				
+            		  apds9900_set_pilt(client, 1023);	// to force first Near-to-Far interrupt
+            		  apds9900_set_piht(client, 0);
+              	  papds9900_data->ps_detection = 1;			// we are forcing Near-to-Far interrupt, so this is defaulted to 1
+
+			if(lge_bd_rev <= LGE_REV_C){
+			papds9900_data->ps_threshold = 650;
+                	papds9900_data->ps_hysteresis_threshold = 550;
+		
+			}else{	
+               	 papds9900_data->ps_threshold = APDS990x_PS_DETECTION_THRESHOLD;
+               	 papds9900_data->ps_hysteresis_threshold = APDS990x_PS_HSYTERESIS_THRESHOLD;
+			}	
 				if(apds9900_debug_mask & APDS9900_DEBUG_GEN_INFO)
 					DEBUG_MSG("### apds9900_set_enable initialize ps_threshold\n");
 			}
@@ -1420,6 +1363,8 @@ static ssize_t apds9900_store_enable1(struct device *dev, struct device_attribut
         ret = apds9900_set_enable(client, 0); 
     else if (value ==1)
         ret = apds9900_set_enable(client, 0x2F); 
+    else if (value ==2)
+	ret = apds9900_set_enable(client, 0x1F); 	
     else
     {
     	if(apds9900_debug_mask & APDS9900_DEBUG_ERROR_CHECK)
@@ -1538,7 +1483,7 @@ static ssize_t apds9900_store_als_data(struct device *dev, struct device_attribu
 }
 
 
-static DEVICE_ATTR(enable1, S_IWUSR | S_IRUGO | S_IRGRP | S_IROTH , apds9900_show_enable1, apds9900_store_enable1);
+static DEVICE_ATTR(enable1, S_IWUSR | S_IRUGO | S_IWGRP | S_IRGRP | S_IROTH | S_IWOTH, apds9900_show_enable1, apds9900_store_enable1);
 
 static DEVICE_ATTR(proximity_enable, S_IWUSR | S_IRUGO | S_IRGRP | S_IROTH , apds9900_show_proximity_enable, apds9900_store_proximity_enable);
 
@@ -1597,6 +1542,10 @@ static const struct attribute_group apds9900_attr_group =
 /*
  * Initialization function
  */
+
+//seungkwan.jung
+extern int lge_bd_rev;
+
 static int apds9900_device_parameter_init(struct i2c_client *client)
 {
 	struct apds9900_platform_data* pdata = client->dev.platform_data;
@@ -1605,24 +1554,44 @@ static int apds9900_device_parameter_init(struct i2c_client *client)
 	    DEBUG_MSG("apds9900 device paremeter (re)init .\n");
 
     apds9900_set_wtime(client, 0xFF);   /* 0xFF : WAIT=2.72ms */
-    apds9900_set_control(client, 0x20); /* 100mA, IR-diode, 1X PGAIN,  1X AGAIN */
-    apds9900_set_config(client, 0x00);  /* unless they need to use wait time more than > 700ms */
+    if(lge_bd_rev <= LGE_REV_C){
+		apds9900_set_control(client, 0xE0); /* 12.5mA, IR-diode, 1X PGAIN,  1X AGAIN */
+    }else{
+	       apds9900_set_control(client, 0x20); /* 100mA, IR-diode, 1X PGAIN,  1X AGAIN */
+    }
+		apds9900_set_config(client, 0x00);  /* unless they need to use wait time more than > 700ms */
 
     /* ALS tuning */
     apds9900_set_atime(client, 0xDE);   /* ALS = 100ms , MAX count = 37888 */
 
     /* proximity tuning */
     apds9900_set_ptime(client, 0xFF);   /* recommended value. don't change it unless there's proper reason PTIME = 2.72ms, MAX count = 1023 */
-    apds9900_set_ppcount(client, pdata->ppcount);  /* use 8-pulse should be enough for evaluation */
+
+	if(lge_bd_rev ==LGE_REV_B){
+		pdata->ppcount =24;
+		}
+	if(lge_bd_rev ==LGE_REV_C){
+		pdata->ppcount =35;
+		}
+	apds9900_set_ppcount(client, pdata->ppcount);  /* use 8-pulse should be enough for evaluation */
 
     /* interrupt tuning */
 	//apds9900_set_pers(client, 0x33);	// 3 consecutive Interrupt persistence
-	apds9900_set_pers(client, 0x14);	// 1 consecutive Interrupt persistence
+	apds9900_set_pers(client, 0x34);	// 5 consecutive Interrupt persistence
 	apds9900_set_pilt(client, 1023);	// to force first Near-to-Far interrupt
 	apds9900_set_piht(client, 0);
 	papds9900_data->ps_detection = 1;			// we are forcing Near-to-Far interrupt, so this is defaulted to 1
-	papds9900_data->ps_threshold = APDS990x_PS_DETECTION_THRESHOLD;
-	papds9900_data->ps_hysteresis_threshold = APDS990x_PS_HSYTERESIS_THRESHOLD;
+
+
+	if(lge_bd_rev <= LGE_REV_C){
+	papds9900_data->ps_threshold = 650;
+       papds9900_data->ps_hysteresis_threshold = 550;
+		
+	}else{	
+       papds9900_data->ps_threshold = APDS990x_PS_DETECTION_THRESHOLD;
+       papds9900_data->ps_hysteresis_threshold = APDS990x_PS_HSYTERESIS_THRESHOLD;
+	}	
+	
 	// sensor is in disabled mode but all the configurations are preset
     return 0;
 }
@@ -1704,9 +1673,6 @@ static int __devinit apds9900_probe(struct i2c_client *client,
     papds9900_data->client = client;
     i2c_set_clientdata(client, papds9900_data);
     
-#ifdef APDS9900_USE_MUTEX
-    mutex_init(&papds9900_data->lock);
-#endif
     papds9900_data->enable = 0;	/* default mode is standard */
     papds9900_data->ps_detection = 0; /* default to no detection == far */    
 	papds9900_data->ps_threshold = 0;
@@ -1895,11 +1861,8 @@ static int apds9900_suspend(struct device *device)
 	if(apds9900_debug_mask & APDS9900_DEBUG_GEN_INFO)
 		DEBUG_MSG("### apds9900_suspend, papds9900_data->enable=%d\n", papds9900_data->enable);
 
-#ifdef APDS9900_USE_MUTEX
-#else
 	set_irq_wake(papds9900_data->client->irq, 0);
 	disable_irq(papds9900_data->client->irq);
-#endif
 
 	apds9900_enable_backup = papds9900_data->enable;
 
@@ -1913,18 +1876,12 @@ static int apds9900_suspend(struct device *device)
 		pdata->power(0);
 	}
 
-#ifdef APDS9900_USE_MUTEX
-	mutex_lock(&papds9900_data->lock);
-#endif
 	return 0;
 }
 
 static int apds9900_resume(struct device *device)
 {
 	struct apds9900_platform_data* pdata = (struct apds9900_platform_data* )device->platform_data;
-#ifdef APDS9900_USE_MUTEX
-	mutex_unlock(&papds9900_data->lock);
-#endif
 
 	if(apds9900_debug_mask & APDS9900_DEBUG_GEN_INFO)
 		DEBUG_MSG("### apds9900_resume, papds9900_data->enable=%d, enable_backup=%d\n", papds9900_data->enable,apds9900_enable_backup);
@@ -1939,11 +1896,8 @@ static int apds9900_resume(struct device *device)
 	//if((papds9900_data->enable == 0x2F)||(papds9900_data->enable ==0))
 	apds9900_set_enable(papds9900_data->client, apds9900_enable_backup);
 
-#ifdef APDS9900_USE_MUTEX
-#else
 	enable_irq(papds9900_data->client->irq);
 	set_irq_wake(papds9900_data->client->irq, 1);
-#endif
 
 	return 0;
 }

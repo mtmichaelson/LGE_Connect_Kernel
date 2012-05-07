@@ -139,8 +139,6 @@ static struct device_attribute led_class_attrs[] = {
 #ifdef CONFIG_LEDS_TRIGGERS
 	__ATTR(trigger, 0644, led_trigger_show, led_trigger_store),
 #endif
-
-
 	__ATTR_NULL,
 };
 

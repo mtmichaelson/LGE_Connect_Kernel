@@ -1806,7 +1806,3 @@ source "security/Kconfig"
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-
-#LG_KERNEL_EXPAND -- start
-source "kernel/Kconfig.sysprof"
-#LG_KERNEL_EXPAND -- end

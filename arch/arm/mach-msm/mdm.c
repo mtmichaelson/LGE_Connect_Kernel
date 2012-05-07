@@ -78,8 +78,8 @@ int uls_mdm_status_low_flag = false;	// set to true from MDM2AP_STATUS(0)
 					pr_info(__VA_ARGS__); \
 			} while (0);
 
-// soojin.chae@lge.com, 2011-9-9, revert this feature befere releasing official CR
-//#define LGE_DONT_CHECK_MDM_GPIO
+// soojin.chae@lge.com, 2011-8-20, Don't check MSM2AP_STATUS gpio when MDM shut down
+#define LGE_DONT_CHECK_MDM_GPIO
 
 DECLARE_COMPLETION(charm_needs_reload);
 DECLARE_COMPLETION(charm_boot);
@@ -191,7 +191,11 @@ static long charm_modem_ioctl(struct file *filp, unsigned int cmd,
 			charm_boot_status = 0;
 		charm_ready = 1;
 
+		/* kwangdo.yi@lge.com [jointlab] Wed 24 Aug 2011 S
+		   set gpio 132 down for rock bottom current 
+*/
 		gpio_set_value(AP2MDM_KPDPWR_N, 0);
+		/* kwangdo.yi@lge.com [jointlab] Wed 24 Aug 2011 E */
 		if (!first_boot)
 			complete(&charm_boot);
 		else
@@ -272,10 +276,8 @@ static void charm_fatal_fn(struct work_struct *work)
 {
 	pr_info("Reseting the charm due to an errfatal\n");
 /* soojin.chae@lge.com, 2011-8-24, [MDM BSP] prevent MDM power-down when MDM crashed */
-/*
 	if (get_restart_level() == RESET_SOC)
 		pm8058_stay_on();
-*/
 /* soojin.chae@lge.com, 2011-8-24, [MDM BSP] prevent MDM power-down when MDM crashed */
 #ifdef CONFIG_LGE_SDIO_DEBUG_CH	
 	uls_mdm_crash_fatal_flag = true; //wj1208.jo@lge.com, 2011-09-20, [MDM BSP] for ULS display
@@ -301,7 +303,7 @@ static irqreturn_t charm_status_change(int irq, void *dev_id)
 	if ((gpio_get_value(MDM2AP_STATUS) == 0) && charm_ready) {
 		CHARM_DBG("%s: scheduling work now\n", __func__);
 //		queue_work(charm_queue, &charm_status_work);
-		queue_delayed_work(charm_queue, &charm_status_work, msecs_to_jiffies(10));
+		queue_delayed_work(charm_queue, &charm_status_work, msecs_to_jiffies(20));
 	} else if (gpio_get_value(MDM2AP_STATUS) == 1) {
 		CHARM_DBG("%s: charm is now ready\n", __func__);
 	}
@@ -477,6 +479,7 @@ static int __devexit charm_modem_remove(struct platform_device *pdev)
 	return misc_deregister(&charm_modem_misc);
 }
 
+
 static void charm_modem_shutdown(struct platform_device *pdev)
 {
 	int i;
@@ -497,6 +500,7 @@ static void charm_modem_shutdown(struct platform_device *pdev)
 			break;
 	}
 #endif /* LGE_DONT_CHECK_MDM_GPIO */
+
 
 #ifndef LGE_DONT_CHECK_MDM_GPIO
 	if (i <= 0) {

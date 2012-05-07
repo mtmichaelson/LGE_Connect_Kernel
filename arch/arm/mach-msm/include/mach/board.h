@@ -59,6 +59,8 @@ struct msm_camera_io_clk {
 struct msm_camera_device_platform_data {
 //Start to seperate main/vt camera power jisun.shin@lge.com 2011.06.01.
 #ifdef CONFIG_LGE_CAMERA 
+	void (*camera_power_on_IO_Digital) (void);
+	void (*camera_power_on_Analog) (void);
 	void (*camera_power_on) (void);
 	void (*camera_power_off)(void);
 #endif
@@ -182,6 +184,9 @@ struct msm_camera_sensor_info {
 	int sensor_pwd;
 	int vcm_pwd;
 	int vcm_enable;
+#if defined (CONFIG_LGE_SENSOR_MT9M114) || (CONFIG_LGE_SENSOR_MT9V113)
+    int vt_mclk_enable;
+#endif
 	int mclk;
 	int flash_type;
 	struct msm_camera_sensor_platform_info *sensor_platform_info;

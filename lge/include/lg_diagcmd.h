@@ -410,8 +410,6 @@ Don't change previous defines and add new id at the end
 // LG_FW : 2011.07.07 moon.yongho : saving webdload status variable to eMMC. ----------[[
 #define DIAG_WEBDLOAD_COMMON_F		239  /*==>  0xef*/
 // LG_FW : 2011.07.07 moon.yongho -------------------------------------------]]
-
-
 #define DIAG_WIFI_MAC_ADDR 214
 #ifdef CONFIG_LGE_DLOAD_SRD 
 #define DIAG_USET_DATA_BACKUP          249
@@ -420,9 +418,7 @@ Don't change previous defines and add new id at the end
 /* Number of packets defined. */
 #define DIAG_TEST_MODE_F          250  
 
-//#ifdef LG_SMS_PC_TEST
 #define DIAG_SMS_TEST_F	220
-//#endif
 /* LGE_MERGE_S [sunmyoung.lee@lge.com] 2010-07-16. SMS UTS Test */
 #if 1 //defined (CONFIG_MACH_MSM7X27_THUNDERC) || defined (LG_FW_UDM)
 #define DIAG_UDM_SMS_MODE			252
@@ -430,11 +426,7 @@ Don't change previous defines and add new id at the end
 /* LGE_MERGE_E [sunmyoung.lee@lge.com] 2010-07-16. SMS UTS Test */
 
 #define DIAG_LCD_Q_TEST_F         253
-
-
-
 #define DIAG_ERI_CMD_F         254
-
 
 #define DIAG_MAX_F                 255
 

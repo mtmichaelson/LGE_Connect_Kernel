@@ -3650,78 +3650,104 @@ static struct i2c_board_info msm_i2c_gsbi12_info[] = {
 #endif //CONFIG_LGE_SENSOR
 
 #ifdef CONFIG_LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C	
-/* GSBI1 */
-#define SYNAPTICS_T1320_TS_I2C_SDA					35		
-#define SYNAPTICS_T1320_TS_I2C_SCL					36
-#define SYNAPTICS_T1320_TS_I2C_INT_GPIO				61
+#define SYNAPTICS_T1320_TS_I2C_SDA                 35
+#define SYNAPTICS_T1320_TS_I2C_SCL                 36
+#define SYNAPTICS_T1320_TS_I2C_INT_GPIO 61
+static struct touch_device_caps touch_caps = {
+	.button_support 			= 1,
+//	.y_button_boundary			= 0,
+//	.button_margin				= 0,
+	.number_of_button 			= 3,
+	.button_name 				= {KEY_MENU,KEY_HOME,KEY_BACK},
+	.button_margin 				= 10,
+	.is_width_supported 		= 1,
+	.is_pressure_supported 		= 1,
+	.is_id_supported			= 1,
+	.max_width 					= 15,
+	.max_pressure 				= 0xFF,
+	.max_id						= MAX_FINGER,
+	.lcd_x						= 720,
+	.lcd_y						= 1280,
+	.x_max						= 1110,
+	.y_max						= 1973,
+};
+static struct touch_operation_role	touch_role = {
+	.operation_mode 		= 1,
+	.key_type				= TOUCH_HARD_KEY,
+	.delta_pos_threshold 	= 5,
+	.palm_threshold			= 0,
+	.orientation 			= 0,
+	.booting_delay 			= 400,
+	.reset_delay			= 20,
+	.baseline_reset_delay	= 20,
+	.suspend_pwr			= POWER_OFF,
+	.irqflags 				= IRQF_TRIGGER_FALLING,
+};
+int synaptics_t1320_power_on(int on){
 
-int synaptics_t1320_power_on(int on, bool log_en)
-{
- 	int rc = -EINVAL;
-	static struct regulator *vreg_l19;
+	int rc = -EINVAL;
+	static struct regulator *vreg_t1320;
 	static struct regulator *vreg_lvs2;
+	bool log_en = 1;
 
 	if(log_en)
 		printk(KERN_INFO "[Touch D] %s: power %s\n", __func__, on ? "On" : "Off");
 
-	vreg_l19 = regulator_get(NULL, "8058_l19");           /* +3V0_TOUCH */
-	if (IS_ERR(vreg_l19)) {
-		pr_err("%s: regulator get of 8058_l19 failed (%ld)\n", __func__, PTR_ERR(vreg_l19));
-		rc = PTR_ERR(vreg_l19);
+	vreg_t1320 = regulator_get(NULL, "8058_l19");		/* +3V0_TOUCH */
+
+	if (IS_ERR(vreg_t1320)) {
+		pr_err("%s: regulator get of 8058_l17 or 119 failed (%ld)\n", __func__, PTR_ERR(vreg_t1320));
+		rc = PTR_ERR(vreg_t1320);
 		return rc;
 	}
-	rc = regulator_set_voltage(vreg_l19, 3000000, 3000000);
 
-	vreg_lvs2 = regulator_get(NULL, "8901_lvs2");         /* +1V8_TOUCH_VIO */
+	rc = regulator_set_voltage(vreg_t1320, 3000000, 3000000);
+
+	vreg_lvs2 = regulator_get(NULL, "8901_lvs2");	/* +1V8_TOUCH_VIO */
+
 	if (IS_ERR(vreg_lvs2)) {
 		pr_err("%s: regulator get of 8901_lvs2 failed (%ld)\n", __func__, PTR_ERR(vreg_lvs2));
 		rc = PTR_ERR(vreg_lvs2);
 		return rc;
-	}
+		}
+
 	rc = regulator_set_voltage(vreg_lvs2, 1800000, 1800000);
 
-	if(on)
-	{
-		rc = regulator_enable(vreg_l19);
+	if(on)	{
+		rc = regulator_enable(vreg_t1320);
 		rc = regulator_enable(vreg_lvs2);
 	}
-	else
-	{
+	else	{
 		rc = regulator_disable(vreg_lvs2);
-		rc = regulator_disable(vreg_l19);
+		rc = regulator_disable(vreg_t1320);
+	}
+	return rc;
 	}
 
-	return rc;
-}
+static struct touch_power_module touch_pwr = {
+	.use_regulator = 0,
+	.vdd = "8058_l19",
+	.vdd_voltage = 3000000,
+	.vio = "8901_lvs2",
+	.vio_voltage = 1800000,
+	.power = synaptics_t1320_power_on,
+};
 
-static struct synaptics_ts_platform_data synaptics_t1320_ts_platform_data[] = {
-       {
-		.use_irq        		= 1,
-		.irqflags       		= IRQF_TRIGGER_FALLING,
-		.i2c_sda_gpio   		= SYNAPTICS_T1320_TS_I2C_SDA,
-		.i2c_scl_gpio		= SYNAPTICS_T1320_TS_I2C_SCL,
-		.i2c_int_gpio		= SYNAPTICS_T1320_TS_I2C_INT_GPIO,
-		.power			= synaptics_t1320_power_on,
-		.ic_booting_delay	= 400,		/* ms */
-		.report_period		= 12500000, 	/* 12.5 msec */
-		.num_of_finger		= 10,
-		.num_of_button	= 3,
-		.button[0]			= KEY_MENU,
-		.button[1]			= KEY_HOME,
-		.button[2]			= KEY_BACK,
-		.x_max			= 1106,
-		.y_max			= 1974,
-		.fw_ver			= 1,
-	},
+static struct touch_platform_data  i_att_ts_data = {
+	.int_pin	= SYNAPTICS_T1320_TS_I2C_INT_GPIO,
+	.caps	= &touch_caps,
+	.role	= &touch_role,
+	.pwr	= &touch_pwr,
 };
 
 static struct i2c_board_info msm_i2c_synaptics_ts_info[] = {
 	{
-		I2C_BOARD_INFO("synaptics_ts",      0x20),
-        .platform_data = &synaptics_t1320_ts_platform_data,
-        .irq = MSM_GPIO_TO_INT(SYNAPTICS_T1320_TS_I2C_INT_GPIO),
+		I2C_BOARD_INFO(LGE_TOUCH_NAME,      0x20),
+		.platform_data = &i_att_ts_data,
+		.irq = MSM_GPIO_TO_INT(SYNAPTICS_T1320_TS_I2C_INT_GPIO),
 	}
 };
+
 #else
 static struct regulator *vreg_tmg200;
 
@@ -3982,20 +4008,18 @@ static struct platform_device msm_rpm_log_device = {
 
 #ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
 static struct msm_charger_platform_data msm_charger_data = {
-	.safety_time = 360,
+	.safety_time = 480,
 	.update_time = 1,
-	.max_voltage = 4350,
+	.max_voltage = 4200,
 	.min_voltage = 3200,
-	.resume_voltage = 4200,
 };
 
 #else
 static struct msm_charger_platform_data msm_charger_data = {
-	.safety_time = 180,
+	.safety_time = 480,
 	.update_time = 1,
 	.max_voltage = 4200,
 	.min_voltage = 3200,
-	.resume_voltage = 4100,
 };
 #endif
 
@@ -4186,7 +4210,7 @@ RPM_VREG_INIT_LDO_PF(PM8058_L0,  0, 1, 0, 1200000, 1200000, LDO150HMIN,RPM_VREG_
 	RPM_VREG_INIT_LDO(PM8058_L20, 0, 1, 0, 1800000, 1800000, LDO150HMIN, 0),	/*+1V8_RF_XO*/
 	RPM_VREG_INIT_LDO_PF(PM8058_L21, 1, 1, 0, 1200000, 1200000, LDO150HMIN,RPM_VREG_PIN_CTRL_NONE, RPM_VREG_PIN_FN_SLEEP_B),/*+1V1_MSM_PLL*/
 	RPM_VREG_INIT_LDO(PM8058_L22, 0, 1, 0, 1200000, 1200000, LDO300HMIN, 0),	/*+1V2_DDR_EBI*/
-	RPM_VREG_INIT_LDO(PM8058_L23, 0, 1, 0, 1800000, 1800000, LDO300HMIN, 0),	/*+1V8_MSM_EBI*/
+	RPM_VREG_INIT_LDO(PM8058_L23, 0, 1, 0, 1200000, 1200000, LDO300HMIN, 0),	/*4.7uF CAP - GND*/
 	RPM_VREG_INIT_LDO(PM8058_L24, 0, 1, 0, 1200000, 1200000, LDO150HMIN, 0),	/*4.7uF CAP - GND*/
 	RPM_VREG_INIT_LDO(PM8058_L25, 0, 1, 0, 1200000, 1200000, LDO150HMIN, 0),	/*4.7uF CAP - GND*/
 
@@ -5473,7 +5497,7 @@ static struct platform_device *surf_devices[] __initdata = {
 	&rpm_vreg_device[RPM_VREG_ID_PM8058_L20],
 	&rpm_vreg_device[RPM_VREG_ID_PM8058_L21],
 	&rpm_vreg_device[RPM_VREG_ID_PM8058_L22],
-	&rpm_vreg_device[RPM_VREG_ID_PM8058_L23],
+	/*&rpm_vreg_device[RPM_VREG_ID_PM8058_L23],*/
 	/*&rpm_vreg_device[RPM_VREG_ID_PM8058_L24],*/
 	/*&rpm_vreg_device[RPM_VREG_ID_PM8058_L25],*/
 	&rpm_vreg_device[RPM_VREG_ID_PM8058_S2],

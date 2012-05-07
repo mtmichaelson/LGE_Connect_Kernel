@@ -46,6 +46,6 @@ menu "Power"
 source "lge/com_device/power/Kconfig"
 endmenu
 
-menu "MHL"
+menu "MHL V1"
 source "lge/com_device/mhl_v1/Kconfig"
 endmenu

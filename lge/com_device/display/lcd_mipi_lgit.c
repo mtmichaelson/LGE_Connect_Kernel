@@ -24,13 +24,6 @@
 #include <mach/board_lge.h>
 
 #define LGIT_IEF
-#define LGIT_CABC
-#define LGIT_IEF_SWITCH
-
-#ifdef LGIT_IEF_SWITCH
-struct msm_fb_data_type *local_mfd0 = NULL;
-static int is_ief_on = 1;
-#endif
 
 static struct msm_panel_common_pdata *mipi_lgit_pdata;
 
@@ -40,7 +33,7 @@ static struct dsi_buf lgit_rx_buf;
 #define LCD_RESET_N	50
 
 static char dsi_config    [6] = {0xE0, 0x43, 0x00, 0x80, 0x00, 0x00};
-static char display_mode1 [6] = {0xB5, 0x29, 0x20, 0x40, 0x00, 0x20};
+static char display_mode1 [6] = {0xB5, 0x29, 0x20, 0x40, 0x00, 0x00};
 static char display_mode2 [6] = {0xB6, 0x01, 0x14, 0x0F, 0x16, 0x13};
 
 static char p_gamma_r_setting[10] = {0xD0, 0x00, 0x30, 0x56, 0x01, 0x12, 0x04, 0x34, 0x10, 0x01};
@@ -50,43 +43,27 @@ static char n_gamma_g_setting[10] = {0xD3, 0x02, 0x51, 0x56, 0x06, 0x08, 0x00, 0
 static char p_gamma_b_setting[10] = {0xD4, 0x00, 0x30, 0x56, 0x01, 0x12, 0x04, 0x34, 0x10, 0x01};
 static char n_gamma_b_setting[10] = {0xD5, 0x02, 0x51, 0x56, 0x06, 0x08, 0x00, 0x47, 0x12, 0x02};
 
-static char p_gamma_r_setting_2P5[10] = {0xD0, 0x00, 0x11, 0x77, 0x23, 0x16, 0x06, 0x62, 0x41, 0x03};
-static char n_gamma_r_setting_2P5[10] = {0xD1, 0x00, 0x14, 0x63, 0x23, 0x08, 0x06, 0x41, 0x33, 0x04};
-static char p_gamma_g_setting_2P5[10] = {0xD2, 0x00, 0x11, 0x77, 0x23, 0x16, 0x06, 0x62, 0x41, 0x03};
-static char n_gamma_g_setting_2P5[10] = {0xD3, 0x00, 0x14, 0x63, 0x23, 0x08, 0x06, 0x41, 0x33, 0x04};
-static char p_gamma_b_setting_2P5[10] = {0xD4, 0x00, 0x11, 0x77, 0x23, 0x16, 0x06, 0x62, 0x41, 0x03};
-static char n_gamma_b_setting_2P5[10] = {0xD5, 0x00, 0x14, 0x63, 0x23, 0x08, 0x06, 0x41, 0x33, 0x04};
+static char p_gamma_r_setting_2P5[10] = {0xD0, 0x00, 0x11, 0x64, 0x35, 0x18, 0x06, 0x51, 0x32, 0x02};
+static char n_gamma_r_setting_2P5[10] = {0xD1, 0x20, 0x14, 0x64, 0x34, 0x01, 0x05, 0x71, 0x33, 0x04};
+static char p_gamma_g_setting_2P5[10] = {0xD2, 0x00, 0x11, 0x64, 0x35, 0x18, 0x06, 0x51, 0x32, 0x02};
+static char n_gamma_g_setting_2P5[10] = {0xD3, 0x20, 0x14, 0x64, 0x34, 0x01, 0x05, 0x71, 0x33, 0x04};
+static char p_gamma_b_setting_2P5[10] = {0xD4, 0x00, 0x11, 0x64, 0x35, 0x18, 0x06, 0x51, 0x32, 0x02};
+static char n_gamma_b_setting_2P5[10] = {0xD5, 0x20, 0x14, 0x64, 0x34, 0x01, 0x05, 0x71, 0x33, 0x04};
 
 #ifdef LGIT_IEF
 static char ief_set0[2] = {0x70, 0x0F}; //{0x70, 0x07};
 static char ief_set1[5] = {0x71, 0x00, 0x00, 0x01, 0x01};
 static char ief_set2[3] = {0x72, 0x01, 0x0F};
 static char ief_set3[4] = {0x73, 0x34, 0x52, 0x00};
-static char ief_set4[4] = {0x74, 0x04, 0x01, 0x07}; //{0x74, 0x04, 0x01, 0x00};
-static char ief_set5[4] = {0x75, 0x03, 0x0F, 0x07}; //{0x75, 0x03, 0x0F, 0x00};
-static char ief_set6[4] = {0x76, 0x07, 0x00, 0x05}; //{0x76, 0x07, 0x00, 0x04};
-static char ief_set7[9] = {0x77, 0x3D, 0x3D, 0x3D, 0x3D, 0x3D, 0x3D, 0x3D, 0x3D}; //{0x77, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40};
-static char ief_set8[9] = {0x78, 0x39, 0x39, 0x39, 0x39, 0x39, 0x39, 0x39, 0x39}; //{0x78, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C};  //new: for I-pjt LCD tunning.;
-static char ief_set9[9] = {0x79, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40};//{0x79, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40};
+static char ief_set4[4] = {0x74, 0x04, 0x01, 0x07};
+static char ief_set5[4] = {0x75, 0x03, 0x0F, 0x07};
+static char ief_set6[4] = {0x76, 0x07, 0x00, 0x05};
+static char ief_set7[9] = {0x77, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40};
+static char ief_set8[9] = {0x78, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E};
+static char ief_set9[9] = {0x79, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40};
 static char ief_setA[9] = {0x7A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 static char ief_setB[9] = {0x7B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 static char ief_setC[9] = {0x7C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-//camera mode
-#ifdef LGIT_IEF_SWITCH
-static char ief_set10[2] = {0x70, 0x0A};
-static char ief_set16[4] = {0x76, 0x00, 0x00, 0x00};   
-static char ief_set15[4] = {0x75, 0x00, 0x00, 0x00}; 
-static char ief_set14[4] = {0x74, 0x00, 0x00, 0x00};
-#endif /* LGIT_IEF_SWITCH*/
-#endif
-
-#if defined(LGIT_CABC)
-static char cabc_set0[2] = {0x51, 0xFF};
-static char cabc_set1[2] = {0x5E, 0xE8};
-static char cabc_set2[2] = {0x53, 0x2C};
-static char cabc_set3[2] = {0x55, 0x01};
-static char cabc_set4[5] = {0xC8, 0x22, 0xE3, 0x01, 0x11};
 #endif
 
 static char osc_setting[3] =     {0xC0, 0x00, 0x00};
@@ -103,7 +80,7 @@ static char power_setting3[10] = {0xC3, 0x00, 0x08, 0x00, 0x00, 0x00, 0x67, 0x88
 static char power_setting4[6] =  {0xC4, 0x22, 0x24, 0x19, 0x19, 0x41};
 static char power_setting3_2P3[10] = {0xC3, 0x00, 0x09, 0x00, 0x00, 0x00, 0x66, 0x88, 0x32, 0x00};
 static char power_setting4_2P3[6] =  {0xC4, 0x22, 0x24, 0x18, 0x18, 0x47};
-static char power_setting3_2P5[10] = {0xC3, 0x00, 0x09, 0x10, 0x12, 0x00, 0x66, 0x20, 0x31, 0x00};
+static char power_setting3_2P5[10] = {0xC3, 0x00, 0x09, 0x10, 0x12, 0x00, 0x66, 0x00, 0x31, 0x00};
 static char power_setting4_2P5[6] =  {0xC4, 0x22, 0x24, 0x18, 0x18, 0x47};
 
 static char otp2_setting[2] =    {0XF9, 0x00};
@@ -150,14 +127,6 @@ static struct dsi_cmd_desc lgit_power_on_set[] = {
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_setC),ief_setC},
 #endif
 
-#if defined(LGIT_CABC)
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set0),cabc_set0},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set1),cabc_set1},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set2),cabc_set2},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set3),cabc_set3},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set4),cabc_set4},
-#endif
-
 	// Power Supply Set
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(osc_setting   ),osc_setting   }, 
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(power_setting3),power_setting3}, 
@@ -202,14 +171,7 @@ static struct dsi_cmd_desc lgit_power_on_set_2P3[] = {
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_setA),ief_setA},
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_setB),ief_setB},
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_setC),ief_setC},
-#endif
 
-#if defined(LGIT_CABC)
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set0),cabc_set0},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set1),cabc_set1},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set2),cabc_set2},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set3),cabc_set3},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set4),cabc_set4},
 #endif
 
 	// Power Supply Set
@@ -258,14 +220,6 @@ static struct dsi_cmd_desc lgit_power_on_set_2P5[] = {
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_setC),ief_setC},
 #endif
 
-#if defined(LGIT_CABC)
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set0),cabc_set0},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set1),cabc_set1},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set2),cabc_set2},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set3),cabc_set3},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(cabc_set4),cabc_set4},
-#endif
-
 	// Power Supply Set
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(osc_setting_2P5   ),osc_setting_2P5   }, 
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(power_setting3_2P5),power_setting3_2P5}, 
@@ -290,61 +244,6 @@ static struct dsi_cmd_desc lgit_power_off_set[] = {
   {DTYPE_DCS_WRITE, 1, 0, 0, 20, sizeof(deep_standby_2), deep_standby_2},
 };
 
-#ifdef LGIT_IEF_SWITCH
-static struct dsi_cmd_desc lgit_power_on_set_camera[] = {		
-// Image Enhancement Function Set
-//	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(display_off),display_off},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_set10),ief_set10},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_set16),ief_set16},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_set15),ief_set15},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_set14),ief_set14},
-//	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(display_on),display_on},
-};
-
-static struct dsi_cmd_desc lgit_power_off_set_camera[] = {	
-	// Image Enhancement Function Set
-//	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(display_off),display_off},		
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_set0),ief_set0},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_set6),ief_set6},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_set5),ief_set5},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(ief_set4),ief_set4},
-//	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(display_on),display_on},
-};
-
-extern int mipi_lgit_lcd_ief_off(void)
-{
-	if(local_mfd0->panel_power_on && is_ief_on) {	
-		mutex_lock(&local_mfd0->dma->ov_mutex);
-		MIPI_OUTP(MIPI_DSI_BASE + 0x38, 0x10000000); //HS mode
-		mipi_dsi_cmds_tx(local_mfd0, &lgit_tx_buf, lgit_power_on_set_camera, ARRAY_SIZE(lgit_power_on_set_camera));
-		is_ief_on = 0;
-		printk("%s, %d\n", __func__,is_ief_on);
-		MIPI_OUTP(MIPI_DSI_BASE + 0x38, 0x14000000);
-		mutex_unlock(&local_mfd0->dma->ov_mutex);
-	}
-                                                                                         
-	return 0;
-} 
-EXPORT_SYMBOL(mipi_lgit_lcd_ief_off);
-
-extern int mipi_lgit_lcd_ief_on(void)
-{	
-	if(local_mfd0->panel_power_on && !is_ief_on) {
-
-		mutex_lock(&local_mfd0->dma->ov_mutex);
-		MIPI_OUTP(MIPI_DSI_BASE + 0x38, 0x10000000);
-		mipi_dsi_cmds_tx(local_mfd0, &lgit_tx_buf, lgit_power_off_set_camera, ARRAY_SIZE(lgit_power_off_set_camera)); 
-		is_ief_on = 1;
-		printk("%s, %d\n", __func__,is_ief_on);
-		MIPI_OUTP(MIPI_DSI_BASE + 0x38, 0x14000000);
-		mutex_unlock(&local_mfd0->dma->ov_mutex);
-	}
-                                                              
-	return 0;                                                                             
-} 
-EXPORT_SYMBOL(mipi_lgit_lcd_ief_on);
-#endif
-
 void mipi_lgit_lcd_reset(void)
 {	
 	gpio_tlmm_config(GPIO_CFG(LCD_RESET_N, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),GPIO_CFG_ENABLE);
@@ -367,14 +266,9 @@ static int mipi_lgit_lcd_on(struct platform_device *pdev)
 	if (mfd->key != MFD_KEY)
 		return -EINVAL;
 
-#ifdef LGIT_IEF_SWITCH
-	if(local_mfd0 == NULL)
-		local_mfd0 = mfd;
-#endif
-
 	printk(KERN_INFO"%s: mipi lgit lcd on started, lge_bd_rev = %d \n", __func__, lge_bd_rev);
 	mipi_lgit_lcd_reset();
-	//mipi_dsi_op_mode_config(DSI_CMD_MODE);
+	mipi_dsi_op_mode_config(DSI_CMD_MODE);
 
 	//display on each panel
 	//This is seperated by HW rev.
@@ -385,13 +279,8 @@ static int mipi_lgit_lcd_on(struct platform_device *pdev)
 			mipi_dsi_cmds_tx(mfd, &lgit_tx_buf, lgit_power_on_set_2P3, ARRAY_SIZE(lgit_power_on_set_2P3));
 		else
 			mipi_dsi_cmds_tx(mfd, &lgit_tx_buf, lgit_power_on_set_2P5, ARRAY_SIZE(lgit_power_on_set_2P5));
-	}
+	}		
 	
-//if camera is on
-#ifdef LGIT_IEF_SWITCH
-	if(!is_ief_on) // if camera is on, turn ief off
-		mipi_dsi_cmds_tx(local_mfd0, &lgit_tx_buf, lgit_power_on_set_camera, ARRAY_SIZE(lgit_power_on_set_camera));
-#endif
 
 	return 0;
 }
@@ -407,7 +296,7 @@ static int mipi_lgit_lcd_off(struct platform_device *pdev)
 
 	printk(KERN_INFO"%s: mipi lgit lcd off started \n", __func__);
 
-	//mipi_dsi_op_mode_config(DSI_CMD_MODE);
+	mipi_dsi_op_mode_config(DSI_CMD_MODE);
 	mipi_dsi_cmds_tx(mfd, &lgit_tx_buf, lgit_power_off_set, ARRAY_SIZE(lgit_power_off_set));
 
 	gpio_tlmm_config(GPIO_CFG(LCD_RESET_N, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),GPIO_CFG_ENABLE);

@@ -32,10 +32,10 @@
 #include <linux/syscalls.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
+#include <linux/i2c.h>
 
-#if defined(CONFIG_LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C)
-#include "touch_synaptics_rmi4_i2c.h"
-#endif
+#include "lge_touch_core.h"
+#include "touch_synaptics.h"
 
 #define PAGE_SELECT_REG			0xFF
 #define BLOCK_NUMBER_LOW_REG	0x00
@@ -126,12 +126,6 @@ $80: Flash Command = Idle ($0), Flash Status = Success ($0),
 Program Enabled = Enabled (1). Any other value indicates an error. */
 static const unsigned char s_uF34ReflashCmd_NormalResult = 0x80;
 
-static int synaptics_fw_upgrade_debug_mask = 0;
-
-extern int synaptics_ts_read(struct i2c_client *client, u8 reg, int num, u8 *buf);
-extern int synaptics_ts_write(struct i2c_client *client, u8 reg, u8 * buf, int len);
-extern int get_synaptics_ts_debug_mask(void);
-
 /* function proto type */
 static int RMI4ReadConfigInfo(struct synaptics_fw_data *fw, struct synaptics_ts_data *ts);
 static int RMI4ReadFirmwareInfo(struct synaptics_fw_data *fw, struct synaptics_ts_data *ts);
@@ -144,17 +138,14 @@ static int RMI4IssueEraseCommand(unsigned char * command,
 		struct synaptics_fw_data *fw, struct synaptics_ts_data *ts);
 static int RMI4setFlashAddrForDifFormat(struct synaptics_fw_data *fw, struct synaptics_ts_data *ts);
 
-static void set_debug_mask(void)
-{
-	synaptics_fw_upgrade_debug_mask = get_synaptics_ts_debug_mask();
-}
-
 static void SynaSleep(unsigned long MilliSeconds, struct synaptics_fw_data *fw)
 {
 	msleep(MilliSeconds);
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_RMI4_I2C_DEBUG_UPGRADE_DELAY)
+#ifdef LGE_TOUCH_TIME_DEBUG
+	if (touch_time_debug_mask & DEBUG_TIME_FW_UPGRADE)
 		fw->total_sleep_count += MilliSeconds * 1000;
+#endif
 }
 
 static int SynaWaitForATTN(int dwMilliseconds,
@@ -162,18 +153,21 @@ static int SynaWaitForATTN(int dwMilliseconds,
 {
 	int trial_us=0;
 
-	while ((gpio_get_value(ts->pdata->i2c_int_gpio) != 0)
+	while ((gpio_get_value(ts->pdata->int_pin) != 0)
 			&& (trial_us < (dwMilliseconds * 1000))) {
-		usleep(1);
+		//usleep(1);
+		udelay(1);
 		trial_us++;
 	}
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_RMI4_I2C_DEBUG_UPGRADE_DELAY) {
+#ifdef LGE_TOUCH_TIME_DEBUG
+	if (touch_time_debug_mask & DEBUG_TIME_FW_UPGRADE) {
 		if(trial_us > 0)
 			fw->total_sleep_count += trial_us;
 	}
+#endif
 
-	if (gpio_get_value(ts->pdata->i2c_int_gpio) != 0)
+	if (gpio_get_value(ts->pdata->int_pin) != 0)
 		return -EBUSY;
 	else
 		return 0;
@@ -182,13 +176,13 @@ static int SynaWaitForATTN(int dwMilliseconds,
 static int SynaWriteRegister(struct i2c_client *client,
 		u8 uRmiAddress, u8 * data, unsigned int length)
 {
-	return synaptics_ts_write(client, uRmiAddress, data, length);
+	return touch_i2c_write(client, uRmiAddress, length, data);
 }
 
 static int SynaReadRegister(struct i2c_client *client,
 		u8 uRmiAddress, u8 * data, unsigned int length)
 {
-	return synaptics_ts_read(client, uRmiAddress, length, data);
+	return touch_i2c_read(client, uRmiAddress, length, data);
 }
 
 static void SpecialCopyEndianAgnostic(unsigned char *dest, unsigned short src)
@@ -199,8 +193,8 @@ static void SpecialCopyEndianAgnostic(unsigned char *dest, unsigned short src)
 
 static void RMI4FuncsConstructor(struct synaptics_fw_data *fw)
 {
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("RMI4FuncsConstructor start\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("RMI4FuncsConstructor start\n");
 
 	/* Initialize data members */
 	fw->m_BaseAddresses.m_QueryBase = 0xff;
@@ -224,19 +218,19 @@ static int RMI4Init(struct synaptics_fw_data *fw, struct synaptics_ts_data *ts)
 {
 	int ret;
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("RMI4Init start\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("RMI4Init start\n");
 
 	/* Set up blockSize and blockCount for UI and config */
 	ret = RMI4ReadConfigInfo(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Config info. read fail\n");
+		TOUCH_ERR_MSG("Config info. read fail\n");
 		return ret;
 	}
 
 	ret = RMI4ReadFirmwareInfo(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Config info. read fail\n");
+		TOUCH_ERR_MSG("Config info. read fail\n");
 		return ret;
 	}
 
@@ -262,7 +256,7 @@ static int RMI4ReadBootloadID(struct synaptics_fw_data *fw, struct synaptics_ts_
 	ret = SynaReadRegister(ts->client,
 			fw->m_uF34ReflashQuery_BootID, (unsigned char *)uData, 2);
 	if (ret < 0)
-		SYNAPTICS_ERR_MSG("m_uF34ReflashQuery_BootID read fail\n");
+		TOUCH_ERR_MSG("m_uF34ReflashQuery_BootID read fail\n");
 
 	fw->m_BootloadID = (unsigned int)uData[0] + (unsigned int)uData[1] * 0x100;
 
@@ -277,7 +271,7 @@ static unsigned char RMI4IssueEnableFlashCommand(struct synaptics_fw_data *fw,
 	ret = SynaWriteRegister(ts->client,
 			fw->m_uF34Reflash_FlashControl, (u8 *)&s_uF34ReflashCmd_Enable, 1);
 	if (ret < 0)
-		SYNAPTICS_ERR_MSG("m_uF34Reflash_FlashControl write fail\n");
+		TOUCH_ERR_MSG("m_uF34Reflash_FlashControl write fail\n");
 
 	return ret;
 }
@@ -291,7 +285,7 @@ static int RMI4WriteBootloadID(struct synaptics_fw_data *fw, struct synaptics_ts
 
 	ret = SynaWriteRegister(ts->client, fw->m_uF34Reflash_BlockData, &uData[0], 2);
 	if (ret < 0)
-		SYNAPTICS_ERR_MSG("m_uF34Reflash_BlockData write fail\n");
+		TOUCH_ERR_MSG("m_uF34Reflash_BlockData write fail\n");
 
 	return ret;
 }
@@ -306,7 +300,7 @@ static int RMI4WaitATTN(int errorCount,
 	/* To work around the physical address error from Control Bridge */
 	ret = SynaWaitForATTN(1000, fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("SynaWaitForATTN 1000ms timeout error\n");
+		TOUCH_ERR_MSG("SynaWaitForATTN 1000ms timeout error\n");
 		return ret;
 	}
 
@@ -323,14 +317,14 @@ static int RMI4WaitATTN(int errorCount,
 		}
 
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("m_uF34Reflash_FlashControl read fail %d times try\n", uErrorCount-1);
+			TOUCH_ERR_MSG("m_uF34Reflash_FlashControl read fail %d times try\n", uErrorCount-1);
 			return ret;
 		}
 
 		/* Clear the attention assertion by reading the interrupt status register */
 		ret = SynaReadRegister(ts->client, fw->m_PdtF01Common.m_DataBase+1, &fw->m_uStatus, 1);
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("m_PdtF01Common.m_DataBase+1 read fail\n");
+			TOUCH_ERR_MSG("m_PdtF01Common.m_DataBase+1 read fail\n");
 			return ret;
 		}
 	} while (fw->m_uPageData[0] != s_uF34ReflashCmd_NormalResult && uErrorCount < errorCount);
@@ -345,20 +339,20 @@ static int RMI4EnableFlashing(struct synaptics_fw_data *fw, struct synaptics_ts_
 	u8 uData[2] = {0};
 	int uErrorCount = 0;
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("RMI4EnableFlashing start\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("RMI4EnableFlashing start\n");
 
 	/* Read bootload ID */
 	ret = RMI4ReadBootloadID(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Bootload ID read fail\n");
+		TOUCH_ERR_MSG("Bootload ID read fail\n");
 		return ret;
 	}
 
 	/* Write bootID to block data registers */
 	ret = RMI4WriteBootloadID(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Bootload ID write fail\n");
+		TOUCH_ERR_MSG("Bootload ID write fail\n");
 		return ret;
 	}
 
@@ -373,14 +367,14 @@ static int RMI4EnableFlashing(struct synaptics_fw_data *fw, struct synaptics_ts_
 		}
 
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("m_uF34Reflash_FlashControl read fail %d times try\n", uErrorCount);
+			TOUCH_ERR_MSG("m_uF34Reflash_FlashControl read fail %d times try\n", uErrorCount);
 			return ret;
 		}
 
 		/* Clear the attention assertion by reading the interrupt status register */
 		ret = SynaReadRegister(ts->client, fw->m_PdtF01Common.m_DataBase+1, &fw->m_uStatus, 1);
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("m_PdtF01Common.m_DataBase+1 read fail\n");
+			TOUCH_ERR_MSG("m_PdtF01Common.m_DataBase+1 read fail\n");
 			return ret;
 		}
 	} while ((( fw->m_uPageData[0] & 0x0f) != 0x00) && (uErrorCount <= 300));
@@ -388,35 +382,35 @@ static int RMI4EnableFlashing(struct synaptics_fw_data *fw, struct synaptics_ts_
 	/* Issue Enable flash command */
 	ret = RMI4IssueEnableFlashCommand(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Enable flash command write fail\n");
+		TOUCH_ERR_MSG("Enable flash command write fail\n");
 		return ret;
 	}
 
 	ret = RMI4ReadPageDescriptionTable(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Page description table read fail\n");
+		TOUCH_ERR_MSG("Page description table read fail\n");
 		return ret;
 	}
 
 	/* Wait for ATTN and check if flash command state is idle */
 	ret = RMI4WaitATTN(300, fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("ATTN wait fail\n");
+		TOUCH_ERR_MSG("ATTN wait fail\n");
 		return ret;
 	}
 
 	/* Read the data block 0 to determine the correctness of the image */
 	ret = SynaReadRegister(ts->client, fw->m_uF34Reflash_FlashControl, &uData[0], 1);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("m_uF34Reflash_FlashControl read fail\n");
+		TOUCH_ERR_MSG("m_uF34Reflash_FlashControl read fail\n");
 		return ret;
 	}
 
 	if (uData[0] == 0x80) {
-		if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-			SYNAPTICS_DEBUG_MSG("flash enabled\n");
+		if (touch_debug_mask & DEBUG_FW_UPGRADE)
+			TOUCH_DEBUG_MSG("flash enabled\n");
 	} else {	/* uData[0] == 0xff */
-		SYNAPTICS_ERR_MSG("flash failed: uData[0]=0x%x\n", uData[0]);
+		TOUCH_ERR_MSG("flash failed: uData[0]=0x%x\n", uData[0]);
 		return -EPERM;
 	}
 
@@ -431,7 +425,7 @@ static int RMI4ReadConfigInfo(struct synaptics_fw_data *fw, struct synaptics_ts_
 
 	ret = SynaReadRegister(ts->client, fw->m_uF34ReflashQuery_ConfigBlockSize, &uData[0], 2);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("m_uF34ReflashQuery_ConfigBlockSize read fail\n");
+		TOUCH_ERR_MSG("m_uF34ReflashQuery_ConfigBlockSize read fail\n");
 		return ret;
 	}
 
@@ -439,7 +433,7 @@ static int RMI4ReadConfigInfo(struct synaptics_fw_data *fw, struct synaptics_ts_
 
 	ret = SynaReadRegister(ts->client, fw->m_uF34ReflashQuery_ConfigBlockCount, &uData[0], 2);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("m_uF34ReflashQuery_ConfigBlockCount read fail\n");
+		TOUCH_ERR_MSG("m_uF34ReflashQuery_ConfigBlockCount read fail\n");
 		return ret;
 	}
 
@@ -457,8 +451,8 @@ static int RMI4ProgramConfiguration(struct synaptics_fw_data *fw, struct synapti
 	unsigned char *puData = fw->m_configImgData;
 	unsigned short blockNum = 0;
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("RMI4ProgramConfiguration start\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("RMI4ProgramConfiguration start\n");
 
 	for (blockNum = 0; blockNum < fw->m_configBlockCount; blockNum++) {
 		SpecialCopyEndianAgnostic(&uData[0], blockNum);
@@ -466,14 +460,14 @@ static int RMI4ProgramConfiguration(struct synaptics_fw_data *fw, struct synapti
 		/* Write Configuration Block Number */
 		ret = SynaWriteRegister(ts->client, fw->m_uF34Reflash_BlockNum, &uData[0], 2);
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("m_uF34Reflash_BlockNum write fail\n");
+			TOUCH_ERR_MSG("m_uF34Reflash_BlockNum write fail\n");
 			return ret;
 		}
 
 		ret = SynaWriteRegister(ts->client,
 				fw->m_uF34Reflash_BlockData, puData, fw->m_configBlockSize);
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("m_uF34Reflash_BlockData write fail\n");
+			TOUCH_ERR_MSG("m_uF34Reflash_BlockData write fail\n");
 			return ret;
 		}
 
@@ -485,14 +479,14 @@ static int RMI4ProgramConfiguration(struct synaptics_fw_data *fw, struct synapti
 
 		ret = RMI4IssueFlashControlCommand(&uData[0], fw, ts);
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("Flash Control Command write fail\n");
+			TOUCH_ERR_MSG("Flash Control Command write fail\n");
 			return ret;
 		}
 
 		/* Wait for ATTN */
 		ret = RMI4WaitATTN(300, fw, ts);
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("ATTN wait fail\n");
+			TOUCH_ERR_MSG("ATTN wait fail\n");
 			return ret;
 		}
 	}
@@ -507,7 +501,7 @@ static int RMI4IssueFlashControlCommand(unsigned char * command,
 
 	ret = SynaWriteRegister(ts->client, fw->m_uF34Reflash_FlashControl, command, 1);
 	if (ret < 0)
-		SYNAPTICS_ERR_MSG("m_uF34Reflash_FlashControl write fail\n");
+		TOUCH_ERR_MSG("m_uF34Reflash_FlashControl write fail\n");
 
 	return ret;
 }
@@ -524,7 +518,7 @@ static int RMI4ResetDevice(struct synaptics_fw_data *fw, struct synaptics_ts_dat
 	uData[0] = 1;
 	ret = SynaWriteRegister(ts->client, m_uF01DeviceControl_CommandReg, &uData[0], 1);
 	if (ret < 0)
-		SYNAPTICS_ERR_MSG("m_uF01DeviceControl_CommandReg write fail\n");
+		TOUCH_ERR_MSG("m_uF01DeviceControl_CommandReg write fail\n");
 
 	return ret;
 }
@@ -535,13 +529,13 @@ static int RMI4DisableFlash(struct synaptics_fw_data *fw, struct synaptics_ts_da
 	unsigned char uData[2];
 	unsigned int uErrorCount = 0;
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("RMI4DisableFlash start\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("RMI4DisableFlash start\n");
 
 	/* Issue a reset command */
 	ret = RMI4ResetDevice(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Reset device fail\n");
+		TOUCH_ERR_MSG("Reset device fail\n");
 		return ret;
 	}
 
@@ -550,7 +544,7 @@ static int RMI4DisableFlash(struct synaptics_fw_data *fw, struct synaptics_ts_da
 	/* Wait for ATTN to be asserted to see if device is in idle state */
 	ret = SynaWaitForATTN(300, fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("SynaWaitForATTN 300ms timeout error\n");
+		TOUCH_ERR_MSG("SynaWaitForATTN 300ms timeout error\n");
 		return ret;
 	}
 
@@ -566,18 +560,18 @@ static int RMI4DisableFlash(struct synaptics_fw_data *fw, struct synaptics_ts_da
 	} while (((fw->m_uPageData[0] & 0x0f) != 0x00) && (uErrorCount <= 300));
 
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("m_uF34Reflash_FlashControl read fail %d times try. m_uPageData = 0x%x\n",
+		TOUCH_ERR_MSG("m_uF34Reflash_FlashControl read fail %d times try. m_uPageData = 0x%x\n",
 				uErrorCount, (fw->m_uPageData[0] & 0x0f));
 		return ret;
 	} else {
-		if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-			SYNAPTICS_DEBUG_MSG("RMI4WaitATTN after errorCount loop, uErrorCount=%d\n", uErrorCount);
+		if (touch_debug_mask & DEBUG_FW_UPGRADE)
+			TOUCH_DEBUG_MSG("RMI4WaitATTN after errorCount loop, uErrorCount=%d\n", uErrorCount);
 	}
 
 	/* Clear the attention assertion by reading the interrupt status register */
 	ret = SynaReadRegister(ts->client, fw->m_PdtF01Common.m_DataBase+1, &fw->m_uStatus, 1);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("m_PdtF01Common.m_DataBase+1 read fail\n");
+		TOUCH_ERR_MSG("m_PdtF01Common.m_DataBase+1 read fail\n");
 		return ret;
 	}
 
@@ -585,16 +579,16 @@ static int RMI4DisableFlash(struct synaptics_fw_data *fw, struct synaptics_ts_da
 	do {
 		ret = SynaReadRegister(ts->client, fw->m_uF01RMI_DataBase, &uData[0], 1);
 		if (ret < 0)
-			SYNAPTICS_ERR_MSG("m_uF01RMI_DataBase read fail\n");
+			TOUCH_ERR_MSG("m_uF01RMI_DataBase read fail\n");
 
-		if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-			SYNAPTICS_DEBUG_MSG("F01 data register bit 6: 0x%x\n", uData[0]);
+		if (touch_debug_mask & DEBUG_FW_UPGRADE)
+			TOUCH_DEBUG_MSG("F01 data register bit 6: 0x%x\n", uData[0]);
 	} while ((uData[0] & 0x40) != 0);
 
 	/* With a new flash image the page description table could change */
 	ret = RMI4ReadPageDescriptionTable(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Page description table read fail\n");
+		TOUCH_ERR_MSG("Page description table read fail\n");
 		return ret;
 	}
 
@@ -629,11 +623,11 @@ static unsigned char RMI4FlashFirmwareWrite(struct synaptics_fw_data *fw, struct
 	unsigned char uData[2];
 	u16 uBlockNum = 0;
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("Flash Firmware starts\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("Flash Firmware starts\n");
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("m_firmwareBlockCount=%d\n", fw->m_firmwareBlockCount);
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("m_firmwareBlockCount=%d\n", fw->m_firmwareBlockCount);
 
 	for (uBlockNum = 0; uBlockNum < fw->m_firmwareBlockCount; ++uBlockNum) {
 		uData[0] = uBlockNum & 0xff;
@@ -642,14 +636,14 @@ static unsigned char RMI4FlashFirmwareWrite(struct synaptics_fw_data *fw, struct
 		/* Write Block Number */
 		ret = SynaWriteRegister(ts->client, fw->m_uF34Reflash_BlockNum, &uData[0], 2);
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("m_uF34Reflash_BlockNum write fail\n");
+			TOUCH_ERR_MSG("m_uF34Reflash_BlockNum write fail\n");
 			return ret;
 		}
 
 		/* Write Data Block */
 		ret = SynaWriteRegister(ts->client, fw->m_uF34Reflash_BlockData, puFirmwareData, fw->m_firmwareBlockSize);
 		if (ret < 0){
-			SYNAPTICS_ERR_MSG("m_uF34Reflash_BlockData write fail\n");
+			TOUCH_ERR_MSG("m_uF34Reflash_BlockData write fail\n");
 			return ret;
 		}
 
@@ -661,24 +655,24 @@ static unsigned char RMI4FlashFirmwareWrite(struct synaptics_fw_data *fw, struct
 		uData[0] = 2;
 		ret = SynaWriteRegister(ts->client, fw->m_uF34Reflash_FlashControl, &uData[0], 1);
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("m_uF34Reflash_FlashControl write fail\n");
+			TOUCH_ERR_MSG("m_uF34Reflash_FlashControl write fail\n");
 			return ret;
 		}
 
-		if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-			SYNAPTICS_DEBUG_MSG("uBlockNum=%d, puFirmwareData=0x%p, m_firmwareBlockCount=%d\n",
+		if (touch_debug_mask & DEBUG_FW_UPGRADE)
+			TOUCH_DEBUG_MSG("uBlockNum=%d, puFirmwareData=0x%p, m_firmwareBlockCount=%d\n",
 						uBlockNum, puFirmwareData, fw->m_firmwareBlockCount);
 
 		/* Wait ATTN. Read Flash Command register and check error */
 		ret = RMI4WaitATTN(300, fw, ts);
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("ATTN wait fail\n");
+			TOUCH_ERR_MSG("ATTN wait fail\n");
 			return ret;
 		}
 	}
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("Flash Firmware done\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("Flash Firmware done\n");
 
 	return ret;
 }
@@ -688,18 +682,18 @@ static int RMI4ProgramFirmware(struct synaptics_fw_data *fw, struct synaptics_ts
 	int ret;
 	unsigned char uData[1];
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("RMI4ProgramFirmware start\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("RMI4ProgramFirmware start\n");
 
 	if (!RMI4ValidateBootloadID(fw->m_bootloadImgID, fw, ts)) {
-		SYNAPTICS_ERR_MSG("Invalided Bootload ID\n");
+		TOUCH_ERR_MSG("Invalided Bootload ID\n");
 		return -EPERM;
 	}
 
 	/* Write bootID to data block register */
 	ret = RMI4WriteBootloadID(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Bootload ID write fail\n");
+		TOUCH_ERR_MSG("Bootload ID write fail\n");
 		return ret;
 	}
 
@@ -707,25 +701,25 @@ static int RMI4ProgramFirmware(struct synaptics_fw_data *fw, struct synaptics_ts
 	uData[0] = 3;
 	ret = RMI4IssueEraseCommand(&uData[0], fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Erase Command fail\n");
+		TOUCH_ERR_MSG("Erase Command fail\n");
 		return ret;
 	}
 
 	ret = RMI4WaitATTN(1000, fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("ATTN wait fail\n");
+		TOUCH_ERR_MSG("ATTN wait fail\n");
 		return ret;
 	}
 
 	/* Write firmware image */
 	ret = RMI4FlashFirmwareWrite(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Firmware write fail\n");
+		TOUCH_ERR_MSG("Firmware write fail\n");
 		return ret;
 	}
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("RMI4ProgramFirmware end\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("RMI4ProgramFirmware end\n");
 
 	return ret;
 }
@@ -737,10 +731,10 @@ static bool RMI4ValidateBootloadID(unsigned short bootloadID,
 
 	ret = RMI4ReadBootloadID(fw, ts);
 	if (ret < 0)
-		SYNAPTICS_ERR_MSG("Read bootload ID fail\n");
+		TOUCH_ERR_MSG("Read bootload ID fail\n");
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("Bootload ID of device: %X, input bootID: %X\n",
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("Bootload ID of device: %X, input bootID: %X\n",
 			fw->m_BootloadID, bootloadID);
 
 	/* check bootload ID against the value found in firmware--but only for image file format version 0 */
@@ -766,7 +760,7 @@ static int RMI4ReadFirmwareInfo(struct synaptics_fw_data *fw, struct synaptics_t
 
 	ret = SynaReadRegister(ts->client, fw->m_uF34ReflashQuery_FirmwareBlockSize, &uData[0], 2);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("m_uF34ReflashQuery_FirmwareBlockSize read fail\n");
+		TOUCH_ERR_MSG("m_uF34ReflashQuery_FirmwareBlockSize read fail\n");
 		return ret;
 	}
 
@@ -774,15 +768,15 @@ static int RMI4ReadFirmwareInfo(struct synaptics_fw_data *fw, struct synaptics_t
 
 	ret = SynaReadRegister(ts->client, fw->m_uF34ReflashQuery_FirmwareBlockCount, &uData[0], 2);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("m_uF34ReflashQuery_FirmwareBlockCount read fail\n");
+		TOUCH_ERR_MSG("m_uF34ReflashQuery_FirmwareBlockCount read fail\n");
 		return ret;
 	}
 
 	fw->m_firmwareBlockCount = uData[0] | (uData[1] << 8);
 	fw->m_firmwareImgSize = fw->m_firmwareBlockCount * fw->m_firmwareBlockSize;
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("m_firmwareBlockSize=%d, m_firmwareBlockCount=%d\n",
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("m_firmwareBlockSize=%d, m_firmwareBlockCount=%d\n",
 			fw->m_firmwareBlockSize, fw->m_firmwareBlockCount);
 
 	return ret;
@@ -807,7 +801,7 @@ static int RMI4ReadPageDescriptionTable(struct synaptics_fw_data *fw, struct syn
 	for (uAddress = DESCRIPTION_TABLE_START; uAddress > 10; uAddress -= sizeof(struct RMI4FunctionDescriptor)) {
 		ret = SynaReadRegister(ts->client, uAddress, (unsigned char *)&Buffer, sizeof(Buffer));
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("RMI4FunctionDescriptor read fail\n");
+			TOUCH_ERR_MSG("RMI4FunctionDescriptor read fail\n");
 			return ret;
 		}
 
@@ -827,8 +821,8 @@ static int RMI4ReadPageDescriptionTable(struct synaptics_fw_data *fw, struct syn
 			break;
 		else
 		{
-			if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-				SYNAPTICS_DEBUG_MSG("Function $%02x found\n", Buffer.m_ID);
+			if (touch_debug_mask & DEBUG_FW_UPGRADE)
+				TOUCH_DEBUG_MSG("Function $%02x found\n", Buffer.m_ID);
 		}
 	}
 
@@ -851,7 +845,7 @@ static int RMI4ReadPageDescriptionTable(struct synaptics_fw_data *fw, struct syn
 
 	ret = RMI4setFlashAddrForDifFormat(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Flash address setting fail\n");
+		TOUCH_ERR_MSG("Flash address setting fail\n");
 		return ret;
 	}
 
@@ -865,30 +859,30 @@ static int RMI4WritePage(struct synaptics_fw_data *fw, struct synaptics_ts_data 
 	unsigned char uF01_RMI_Data[2];
 	unsigned char m_uStatus;
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("RMI4WritePage start\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("RMI4WritePage start\n");
 
 	ret = SynaWriteRegister(ts->client, PAGE_SELECT_REG, (unsigned char *)&uPage, 1);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("PAGE_SELECT_REG write fail\n");
+		TOUCH_ERR_MSG("PAGE_SELECT_REG write fail\n");
 		return ret;
 	}
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE) {
+	if (touch_debug_mask & DEBUG_FW_UPGRADE) {
 		uPage = 0;
 		SynaReadRegister(ts->client, PAGE_SELECT_REG, (unsigned char *)&uPage, 1);
-		SYNAPTICS_DEBUG_MSG("PAGE_SELECT_REG = 0x%x\n", uPage);
+		TOUCH_DEBUG_MSG("PAGE_SELECT_REG = 0x%x\n", uPage);
 	}
 
 	do {
 		ret = SynaReadRegister(ts->client, BLOCK_NUMBER_LOW_REG, (unsigned char *)&m_uStatus, 1);
 		if (ret < 0) {
-			SYNAPTICS_ERR_MSG("BLOCK_NUMBER_LOW_REG read fail\n");
+			TOUCH_ERR_MSG("BLOCK_NUMBER_LOW_REG read fail\n");
 			return ret;
 		}
 
-		if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-			SYNAPTICS_DEBUG_MSG("BLOCK_NUMBER_LOW_REG = 0x%x\n", m_uStatus);
+		if (touch_debug_mask & DEBUG_FW_UPGRADE)
+			TOUCH_DEBUG_MSG("BLOCK_NUMBER_LOW_REG = 0x%x\n", m_uStatus);
 
 		if (m_uStatus & 0x40) {
 			fw->m_bFlashProgOnStartup = true;
@@ -902,52 +896,52 @@ static int RMI4WritePage(struct synaptics_fw_data *fw, struct synaptics_ts_data 
 	} while (m_uStatus & 0x40);
 
 	if (fw->m_bFlashProgOnStartup && !fw->m_bUnconfigured) {
-		if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-			SYNAPTICS_DEBUG_MSG("Bootloader running\n");
+		if (touch_debug_mask & DEBUG_FW_UPGRADE)
+			TOUCH_DEBUG_MSG("Bootloader running\n");
 	} else if (fw->m_bUnconfigured) {
-		if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-			SYNAPTICS_DEBUG_MSG("UI running\n");
+		if (touch_debug_mask & DEBUG_FW_UPGRADE)
+			TOUCH_DEBUG_MSG("UI running\n");
 	}
 
 	ret = RMI4ReadPageDescriptionTable(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Page description table read fail\n");
+		TOUCH_ERR_MSG("Page description table read fail\n");
 		return ret;
 	}
 
 	if (fw->m_PdtF34Flash.m_ID == 0) {
-		SYNAPTICS_ERR_MSG("Function $34(Flash Memory Management) is not supported\n");
+		TOUCH_ERR_MSG("Function $34(Flash Memory Management) is not supported\n");
 		return -EPERM;
 	}
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("Function $34 addresses Control base:$%02x Query base: $%02x\n",
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("Function $34 addresses Control base:$%02x Query base: $%02x\n",
 					fw->m_PdtF34Flash.m_ControlBase, fw->m_PdtF34Flash.m_QueryBase);
 
 	if (fw->m_PdtF01Common.m_ID == 0) {
-		if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-			SYNAPTICS_DEBUG_MSG("Function $01 is not supported\n");
+		if (touch_debug_mask & DEBUG_FW_UPGRADE)
+			TOUCH_DEBUG_MSG("Function $01 is not supported\n");
 		fw->m_PdtF01Common.m_ID = 0x01;
 		fw->m_PdtF01Common.m_DataBase = 0;
 	}
 
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("Function $01 addresses Control base:$%02x Query base: $%02x\n",
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("Function $01 addresses Control base:$%02x Query base: $%02x\n",
 					fw->m_PdtF01Common.m_ControlBase, fw->m_PdtF01Common.m_QueryBase);
 
 	/* Get device status */
 	ret = SynaReadRegister(ts->client,fw->m_PdtF01Common.m_DataBase,
 			&uF01_RMI_Data[0], sizeof(uF01_RMI_Data));
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("BLOCK_NUMBER_LOW_REG read fail\n");
+		TOUCH_ERR_MSG("BLOCK_NUMBER_LOW_REG read fail\n");
 		return ret;
 	} else {
-		if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE) {
+		if (touch_debug_mask & DEBUG_FW_UPGRADE) {
 			/* Check Device Status */
-			SYNAPTICS_DEBUG_MSG("Configured: %s\n", uF01_RMI_Data[0] & 0x80 ? "false" : "true");
-			SYNAPTICS_DEBUG_MSG("FlashProg:  %s\n", uF01_RMI_Data[0] & 0x40 ? "true" : "false");
-			SYNAPTICS_DEBUG_MSG("StatusCode: 0x%x \n", uF01_RMI_Data[0] & 0x0f);
+			TOUCH_DEBUG_MSG("Configured: %s\n", uF01_RMI_Data[0] & 0x80 ? "false" : "true");
+			TOUCH_DEBUG_MSG("FlashProg:  %s\n", uF01_RMI_Data[0] & 0x40 ? "true" : "false");
+			TOUCH_DEBUG_MSG("StatusCode: 0x%x \n", uF01_RMI_Data[0] & 0x0f);
 		}
 	}
 
@@ -967,20 +961,10 @@ static int RMI4ReadFirmwareHeader(struct synaptics_fw_data *fw, struct synaptics
 	int ret = 0;
 	unsigned long checkSumCode = 0;
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("RMI4ReadFirmwareHeader start\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("RMI4ReadFirmwareHeader start\n");
 
 	fw->m_fileSize = fw->image_size;
-
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE) {
-		if(ts->fw_path == NULL) {
-			SYNAPTICS_DEBUG_MSG("Scanning SynaFirmware[], the auto-generated C Header File - len = %ld\n",
-					fw->m_fileSize);
-		} else {
-			SYNAPTICS_DEBUG_MSG("Scanning SynaFirmware[], external binary File - len = %ld\n",
-					fw->m_fileSize);
-		}
-	}
 
 	checkSumCode = ExtractLongFromHeader(&(fw->image_bin[0]));
 	fw->m_bootloadImgID = (unsigned int)fw->image_bin[4] + (unsigned int)fw->image_bin[5] * 0x100;
@@ -988,16 +972,16 @@ static int RMI4ReadFirmwareHeader(struct synaptics_fw_data *fw, struct synaptics
 	fw->m_firmwareImgSize = ExtractLongFromHeader(&(fw->image_bin[8]));
 	fw->m_configImgSize = ExtractLongFromHeader(&(fw->image_bin[12]));
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE) {
-		SYNAPTICS_DEBUG_MSG("Target = %s, ", &fw->image_bin[16]);
-		SYNAPTICS_DEBUG_MSG("Cksum = 0x%lX, Id = 0x%X, Ver = %d, FwSize = 0x%lX, ConfigSize = 0x%lX \n",
+	if (touch_debug_mask & DEBUG_FW_UPGRADE) {
+		TOUCH_DEBUG_MSG("Target = %s, ", &fw->image_bin[16]);
+		TOUCH_DEBUG_MSG("Cksum = 0x%lX, Id = 0x%X, Ver = %d, FwSize = 0x%lX, ConfigSize = 0x%lX \n",
 				checkSumCode, fw->m_bootloadImgID, fw->m_firmwareImgVersion, fw->m_firmwareImgSize, fw->m_configImgSize);
 	}
 
 #if !defined(TEST_WRONG_CHIPSET_FW_FORCE_UPGRADE)
 	/* Check prpoer FW */
-	if (strncmp(ts->product_id , &fw->image_bin[16], 10)) {
-		printk(KERN_INFO "[Touch E] IC = %s, Firmware Target = %s\n ", ts->product_id, &fw->image_bin[16]);
+	if (strncmp(ts->fw_info->product_id , &fw->image_bin[16], 10)) {
+		printk(KERN_INFO "[Touch E] IC = %s, Firmware Target = %s\n ", ts->fw_info->product_id, &fw->image_bin[16]);
 		printk(KERN_INFO "[Touch E] WARNING - Firmware is mismatched with Touch IC\n");
 		printk(KERN_INFO "[Touch E] Firmware upgrade stop\n");
 		return -ENODEV;
@@ -1006,7 +990,7 @@ static int RMI4ReadFirmwareHeader(struct synaptics_fw_data *fw, struct synaptics
 
 	ret = RMI4ReadFirmwareInfo(fw, ts);	/* Determine firmware organization - read firmware block size and firmware size */
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Config info. read fail\n");
+		TOUCH_ERR_MSG("Config info. read fail\n");
 		return ret;
 	}
 
@@ -1015,15 +999,15 @@ static int RMI4ReadFirmwareHeader(struct synaptics_fw_data *fw, struct synaptics
 			(unsigned long *)&fw->m_FirmwareImgFile_checkSum);
 
 	if (fw->m_fileSize != (0x100 + fw->m_firmwareImgSize + fw->m_configImgSize))
-		SYNAPTICS_ERR_MSG("SynaFirmware[] size = 0x%lX, expected 0x%lX\n",
+		TOUCH_ERR_MSG("SynaFirmware[] size = 0x%lX, expected 0x%lX\n",
 				fw->m_fileSize, (0x100 + fw->m_firmwareImgSize + fw->m_configImgSize));
 
 	if (fw->m_firmwareImgSize != GetFirmwareSize(fw))
-		SYNAPTICS_ERR_MSG("Firmware image size verfication failed, size in image 0x%lX did not match device size 0x%X\n",
+		TOUCH_ERR_MSG("Firmware image size verfication failed, size in image 0x%lX did not match device size 0x%X\n",
 				fw->m_firmwareImgSize, GetFirmwareSize(fw));
 
 	if (fw->m_configImgSize != GetConfigSize(fw))
-		SYNAPTICS_ERR_MSG("Configuration size verfication failed, size in image 0x%lX did not match device size 0x%X\n",
+		TOUCH_ERR_MSG("Configuration size verfication failed, size in image 0x%lX did not match device size 0x%X\n",
 				fw->m_configImgSize, GetConfigSize(fw));
 
 	fw->m_firmwareImgData = (unsigned char *)((&fw->image_bin[0]) + 0x100);
@@ -1031,7 +1015,7 @@ static int RMI4ReadFirmwareHeader(struct synaptics_fw_data *fw, struct synaptics
 
 	ret = SynaReadRegister(ts->client, fw->m_uF34Reflash_FlashControl, &fw->m_uPageData[0], 1);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("m_uF34Reflash_FlashControl read fail\n");
+		TOUCH_ERR_MSG("m_uF34Reflash_FlashControl read fail\n");
 		return ret;
 	}
 
@@ -1048,11 +1032,11 @@ static int RMI4isExpectedRegFormat(struct synaptics_fw_data *fw, struct synaptic
 	ret = SynaReadRegister(ts->client,
 			fw->m_uF34ReflashQuery_FlashPropertyQuery, &fw->m_uPageData[0], 1);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("RMI4isExpectedRegFormat read fail\n");
+		TOUCH_ERR_MSG("RMI4isExpectedRegFormat read fail\n");
 		return ret;
 	} else {
-		if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-			SYNAPTICS_DEBUG_MSG("FlashPropertyQuery = 0x%x\n", fw->m_uPageData[0]);
+		if (touch_debug_mask & DEBUG_FW_UPGRADE)
+			TOUCH_DEBUG_MSG("FlashPropertyQuery = 0x%x\n", fw->m_uPageData[0]);
 	}
 
 	return (( fw->m_uPageData[0] & 0x01) == 0x01);
@@ -1061,8 +1045,8 @@ static int RMI4isExpectedRegFormat(struct synaptics_fw_data *fw, struct synaptic
 static int RMI4setFlashAddrForDifFormat(struct synaptics_fw_data *fw, struct synaptics_ts_data *ts)
 {
 	int ret;
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("RMI4setFlashAddrForDifFormat start\n");
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("RMI4setFlashAddrForDifFormat start\n");
 
 	ret = RMI4isExpectedRegFormat(fw, ts);
 
@@ -1078,8 +1062,8 @@ static int RMI4setFlashAddrForDifFormat(struct synaptics_fw_data *fw, struct syn
 		fw->m_uF34Reflash_BlockData = fw->m_PdtF34Flash.m_DataBase+3;
 	}
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_DEBUG_FW_UPGRADE)
-		SYNAPTICS_DEBUG_MSG("Image format version %d\n", ret);
+	if (touch_debug_mask & DEBUG_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("Image format version %d\n", ret);
 
 	return ret;
 }
@@ -1089,7 +1073,7 @@ static int RMI4setFlashAddrForDifFormat(struct synaptics_fw_data *fw, struct syn
  * except when this "function number" is $00, meaning end of PDT.
  * In an actual use case this scan might be done only once on first run or before compile.
  */
-int FirmwareUpgrade(struct synaptics_ts_data *ts)
+int FirmwareUpgrade(struct synaptics_ts_data *ts, const char* fw_path)
 {
 	struct synaptics_fw_data *fw;
 	int ret = 0;
@@ -1100,32 +1084,30 @@ int FirmwareUpgrade(struct synaptics_ts_data *ts)
 
 	fw = kzalloc(sizeof(*fw), GFP_KERNEL);
 	if (fw == NULL) {
-		SYNAPTICS_ERR_MSG("Can not allocate  memory\n");
+		TOUCH_ERR_MSG("Can not allocate  memory\n");
 		ret = -ENOMEM;
 		goto exit_upgrade;
 	}
 
-	set_debug_mask();
-
-	if(unlikely(ts->fw_path[0] != 0)) {
+	if(unlikely(fw_path[0] != 0)) {
 		old_fs = get_fs();
 		set_fs(get_ds());
 
-		if ((fd = sys_open((const char __user *) ts->fw_path, O_RDONLY, 0)) < 0) {
-			SYNAPTICS_ERR_MSG("Can not read FW binary from %s\n", ts->fw_path);
+		if ((fd = sys_open((const char __user *) fw_path, O_RDONLY, 0)) < 0) {
+			TOUCH_ERR_MSG("Can not read FW binary from %s\n", fw_path);
 			ret = -EEXIST;
 			goto read_fail;
 		}
 
-		if ((ret = sys_newstat(ts->fw_path, (struct stat *)&fw_bin_stat)) < 0) {
-			SYNAPTICS_ERR_MSG("Can not read FW binary stat from %s\n", ts->fw_path);
+		if ((ret = sys_newstat((char __user *) fw_path, (struct stat *)&fw_bin_stat)) < 0) {
+			TOUCH_ERR_MSG("Can not read FW binary stat from %s\n", fw_path);
 			goto fw_mem_alloc_fail;
 		}
 
 		fw->image_size = fw_bin_stat.st_size;
 		fw->image_bin = kzalloc(sizeof(char) * (fw->image_size+1), GFP_KERNEL);
 		if (fw->image_bin == NULL) {
-			SYNAPTICS_ERR_MSG("Can not allocate  memory\n");
+			TOUCH_ERR_MSG("Can not allocate  memory\n");
 			ret = -ENOMEM;
 			goto fw_mem_alloc_fail;
 		}
@@ -1136,69 +1118,73 @@ int FirmwareUpgrade(struct synaptics_ts_data *ts)
 		/* for checksum */
 		*(fw->image_bin+fw->image_size) = 0xFF;
 
-		SYNAPTICS_INFO_MSG("Touch FW image read %ld bytes from %s\n", read_bytes, ts->fw_path);
+		TOUCH_INFO_MSG("Touch FW image read %ld bytes from %s\n", read_bytes, fw_path);
 	}else {
-		fw->image_size = ts->fw_size-1;
-		fw->image_bin = (unsigned char *)(&ts->fw_bin[0]);
+		fw->image_size = ts->fw_info->fw_size-1;
+		fw->image_bin = (unsigned char *)(&ts->fw_info->fw_start[0]);
 	}
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_RMI4_I2C_DEBUG_UPGRADE_DELAY)
+#ifdef LGE_TOUCH_TIME_DEBUG
+	if (touch_time_debug_mask & DEBUG_TIME_FW_UPGRADE)
 		fw->total_sleep_count = 0;
+#endif
 
 	RMI4FuncsConstructor(fw);
 
 	ret = RMI4WritePage(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Can not write page\n");
+		TOUCH_ERR_MSG("Can not write page\n");
 		goto exit_upgrade;
 	}
 
 	ret = RMI4Init(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("RMI4 init fail\n");
+		TOUCH_ERR_MSG("RMI4 init fail\n");
 		goto exit_upgrade;
 	}
 
 	ret = RMI4setFlashAddrForDifFormat(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Flash address setting fail\n");
+		TOUCH_ERR_MSG("Flash address setting fail\n");
 		goto exit_upgrade;
 	}
 
 	ret = RMI4EnableFlashing(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Flash address setting fail\n");
+		TOUCH_ERR_MSG("Flash address setting fail\n");
 		goto exit_upgrade;
 	}
 
 	ret = RMI4ReadFirmwareHeader(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Firmware header read fail\n");
+		TOUCH_ERR_MSG("Firmware header read fail\n");
 		goto exit_upgrade;
 	}
 
 	ret = RMI4ProgramFirmware(fw, ts);					/* issues the "eraseAll" so must call before any write */
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Program Firmware fail\n");
+		TOUCH_ERR_MSG("Program Firmware fail\n");
 		goto exit_upgrade;
 	}
 
 	ret = RMI4ProgramConfiguration(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Program Configuration fail\n");
+		TOUCH_ERR_MSG("Program Configuration fail\n");
 		goto exit_upgrade;
 	}
 
 	ret = RMI4DisableFlash(fw, ts);
 	if (ret < 0) {
-		SYNAPTICS_ERR_MSG("Disable Flash fail\n");
+		TOUCH_ERR_MSG("Disable Flash fail\n");
 		goto exit_upgrade;
 	}
 
-	if (synaptics_fw_upgrade_debug_mask & SYNAPTICS_RMI4_I2C_DEBUG_UPGRADE_DELAY)
-		SYNAPTICS_DEBUG_MSG("FW upgrade total waiting time count=%ld(us)\n", fw->total_sleep_count);
+#ifdef LGE_TOUCH_TIME_DEBUG
+	if (touch_time_debug_mask & DEBUG_TIME_FW_UPGRADE)
+		TOUCH_DEBUG_MSG("FW upgrade total waiting time count=%ld(us)\n", fw->total_sleep_count);
+#endif
 
-	if(unlikely(ts->fw_path[0] != 0))
+	if(unlikely(fw_path[0] != 0))
 		kfree(fw->image_bin);
 fw_mem_alloc_fail:
 	sys_close(fd);

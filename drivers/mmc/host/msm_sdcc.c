@@ -39,7 +39,6 @@
 #include <linux/memory.h>
 #include <linux/pm_runtime.h>
 #include <linux/wakelock.h>
-
 #include <asm/cacheflush.h>
 #include <asm/div64.h>
 #include <asm/sizes.h>
@@ -55,6 +54,14 @@
 #include "msm_sdcc.h"
 
 #define DRIVER_NAME "msm-sdcc"
+//test_sdcard error count start//
+unsigned int sdcard_crc_c = 0;
+EXPORT_SYMBOL(sdcard_crc_c);
+unsigned int sdcard_datatimeout_c = 0;
+EXPORT_SYMBOL(sdcard_datatimeout_c);
+unsigned int sdcard_unknown = 0;
+EXPORT_SYMBOL(sdcard_unknown);
+//test_sdcard error count end//
 
 #define DBG(host, fmt, args...)	\
 	pr_debug("%s: %s: " fmt "\n", mmc_hostname(host->mmc), __func__ , args)
@@ -646,6 +653,8 @@ msmsdcc_data_err(struct msmsdcc_host *host, struct mmc_data *data,
 			       data->mrq->cmd->opcode);
 			pr_err("%s: blksz %d, blocks %d\n", __func__,
 			       data->blksz, data->blocks);
+            if (host->mmc->index == 2)
+                    sdcard_crc_c++;            
 			data->error = -EILSEQ;
 		}
 	} else if (status & MCI_DATATIMEOUT) {
@@ -659,6 +668,9 @@ msmsdcc_data_err(struct msmsdcc_host *host, struct mmc_data *data,
 			pr_err("%s: Data timeout\n",
 				 mmc_hostname(host->mmc));
 			data->error = -ETIMEDOUT;
+
+            if (host->mmc->index == 2)
+                sdcard_datatimeout_c++;  
 		}
 	} else if (status & MCI_RXOVERRUN) {
 		pr_err("%s: RX overrun\n", mmc_hostname(host->mmc));
@@ -670,6 +682,8 @@ msmsdcc_data_err(struct msmsdcc_host *host, struct mmc_data *data,
 		pr_err("%s: Unknown error (0x%.8x)\n",
 		      mmc_hostname(host->mmc), status);
 		data->error = -EIO;
+         if (host->mmc->index == 2)
+                sdcard_unknown++;
 	}
 
 	/* Dummy CMD52 is not needed when CMD53 has errors */
@@ -1511,6 +1525,7 @@ msmsdcc_check_status(unsigned long data)
 	struct msmsdcc_host *host = (struct msmsdcc_host *)data;
 	unsigned int status;
 
+
 	if (!host->plat->status) {
 		mmc_detect_change(host->mmc, 0);
 	} else {
@@ -2282,7 +2297,6 @@ int msmsdcc_sdio_al_lpm(struct mmc_host *mmc, bool enable)
 			enable_irq(host->irqres->start);
 			host->sdcc_irq_disabled = 0;
 		}
-		wake_lock_timeout(&host->sdio_wlock, 1);
 	}
 	spin_unlock_irqrestore(&host->lock, flags);
 	return 0;

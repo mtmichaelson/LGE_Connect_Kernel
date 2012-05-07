@@ -31,6 +31,7 @@
 #include <../../../drivers/staging/android/timed_output.h>
 #define LG_VIBRATOR_GAIN 115 // 128 -> 115 req by HW
 #define CONFIG_LGE_LOCAL_WORK_VIB
+#define MPCS_FEEDBACK_VIB
 
 #ifdef CONFIG_LGE_LOCAL_WORK_VIB
 static struct workqueue_struct *local_workqueue ;
@@ -75,7 +76,7 @@ static int android_vibrator_force_set(struct timed_vibrator_data *vib, int nForc
 		cancel_work_sync(&vib->work_vibrator_off);
 		hrtimer_cancel(&vib->timer);
 		vib_dutation_ms = atomic_read(&vib->vib_timems);
-#if defined(CONFIG_LGE_AUDIO) && defined(CONFIG_MACH_LGE_I_BOARD_VZW)
+#ifdef MPCS_FEEDBACK_VIB //defined(CONFIG_LGE_AUDIO) && defined(CONFIG_MACH_LGE_I_BOARD_VZW)
 		if(vib_dutation_ms < 40) nForce = 40;
 #endif		
 		vib->vibe_data->power_set(1); /* should be checked for vibrator response time */

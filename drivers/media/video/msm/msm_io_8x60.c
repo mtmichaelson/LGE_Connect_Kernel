@@ -78,7 +78,7 @@
 #define	MIPI_PHY_D0_CONTROL_HS_REC_EQ_SHFT				0x1c
 #define	MIPI_PHY_D1_CONTROL_MIPI_CLK_PHY_SHUTDOWNB_SHFT		0x9
 #define	MIPI_PHY_D1_CONTROL_MIPI_DATA_PHY_SHUTDOWNB_SHFT	0x8
-#define	DBG_CSI 0
+#define	DBG_CSI	0
 
 static struct clk *camio_cam_clk;
 static struct clk *camio_vfe_clk;
@@ -940,9 +940,13 @@ int msm_camio_enable(struct platform_device *pdev)
 		(0x1 << MIPI_PHY_D0_CONTROL2_ERR_SOT_HS_EN_SHFT);
 	CDBG("%s MIPI_PHY_D0_CONTROL2 val=0x%x\n", __func__, val);
 	msm_io_w(val, csibase + MIPI_PHY_D0_CONTROL2);
-	msm_io_w(val, csibase + MIPI_PHY_D1_CONTROL2);
-	msm_io_w(val, csibase + MIPI_PHY_D2_CONTROL2);
-	msm_io_w(val, csibase + MIPI_PHY_D3_CONTROL2);
+	msm_io_w(val, csibase + MIPI_PHY_D1_CONTROL2);	
+//Start : LGE BSP_CAMERA : elin.lee@lge.com 12-19 MIPI HW Block Setting
+	//msm_io_w(val, csibase + MIPI_PHY_D2_CONTROL2);
+	//msm_io_w(val, csibase + MIPI_PHY_D3_CONTROL2);
+	msm_io_w(0x00000000, csibase + MIPI_PHY_D2_CONTROL2);
+	msm_io_w(0x00000000, csibase + MIPI_PHY_D3_CONTROL2);
+//End : LGE BSP_CAMERA : elin.lee@lge.com 12-19 MIPI HW Block Setting
 
 	val = (0x0F << MIPI_PHY_CL_CONTROL_HS_TERM_IMP_SHFT) |
 		(0x0 << MIPI_PHY_CL_CONTROL_LP_REC_EN_SHFT);
@@ -989,8 +993,12 @@ void msm_camio_disable(struct platform_device *pdev)
 	CDBG("%s MIPI_PHY_D0_CONTROL2 val=0x%x\n", __func__, val);
 	msm_io_w(val, csibase + MIPI_PHY_D0_CONTROL2);
 	msm_io_w(val, csibase + MIPI_PHY_D1_CONTROL2);
-	msm_io_w(val, csibase + MIPI_PHY_D2_CONTROL2);
-	msm_io_w(val, csibase + MIPI_PHY_D3_CONTROL2);
+//Start : LGE BSP_CAMERA : elin.lee@lge.com 12-19 MIPI HW Block Setting
+	//msm_io_w(val, csibase + MIPI_PHY_D2_CONTROL2);
+	//msm_io_w(val, csibase + MIPI_PHY_D3_CONTROL2);
+	msm_io_w(0x00000000, csibase + MIPI_PHY_D2_CONTROL2);
+	msm_io_w(0x00000000, csibase + MIPI_PHY_D3_CONTROL2);
+//End : LGE BSP_CAMERA : elin.lee@lge.com 12-19 MIPI HW Block Setting
 
 	val = (0x0F << MIPI_PHY_CL_CONTROL_HS_TERM_IMP_SHFT) |
 		(0x0 << MIPI_PHY_CL_CONTROL_LP_REC_EN_SHFT);
@@ -1033,11 +1041,22 @@ int msm_camio_sensor_clk_on(struct platform_device *pdev)
 	camio_clk = camdev->ioclk;
 
     msm_camera_vreg_enable();
-	msleep(10);
+	//msleep(10);
 	rc = camdev->camera_gpio_on();
 	if (rc < 0)
 		return rc;
-	return msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);
+
+// LGE_DOM_UPDATE_S john.park 2011/1/06 {
+// for mclk is still alive while front camera working.
+    if( !strcmp(sinfo->sensor_name,"mt9v113") ) {
+    		printk("%s[clk should not be enable]: \n", __func__);
+    		return rc;
+	} else {
+		printk("[CAMERA]: %s[clk should be enable]: \n", __func__);
+		return msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);
+	}
+// LGE_DOM_UPDATE_S john.park 2011/1/06 }	
+//	return msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);
 }
 
 int msm_camio_sensor_clk_off(struct platform_device *pdev)
@@ -1124,8 +1143,12 @@ int msm_camio_csi_config(struct msm_camera_csi_params *csi_params)
 	CDBG("%s MIPI_PHY_D0_CONTROL2 val=0x%x\n", __func__, val);
 	msm_io_w(val, csibase + MIPI_PHY_D0_CONTROL2);
 	msm_io_w(val, csibase + MIPI_PHY_D1_CONTROL2);
-	msm_io_w(val, csibase + MIPI_PHY_D2_CONTROL2);
-	msm_io_w(val, csibase + MIPI_PHY_D3_CONTROL2);
+//Start : LGE BSP_CAMERA : elin.lee@lge.com 12-19 MIPI HW Block Setting
+	//msm_io_w(val, csibase + MIPI_PHY_D2_CONTROL2);
+	//msm_io_w(val, csibase + MIPI_PHY_D3_CONTROL2);
+	msm_io_w(0x00000000, csibase + MIPI_PHY_D2_CONTROL2);
+	msm_io_w(0x00000000, csibase + MIPI_PHY_D3_CONTROL2);
+//End : LGE BSP_CAMERA : elin.lee@lge.com 12-19 MIPI HW Block Setting
 
 
 	val = (0x0F << MIPI_PHY_CL_CONTROL_HS_TERM_IMP_SHFT) |
@@ -1166,9 +1189,12 @@ int msm_camio_csi_config(struct msm_camera_csi_params *csi_params)
 
 	/* mask out ID_ERROR[19], DATA_CMM_ERR[11]
 	and CLK_CMM_ERR[10] - de-featured */
-	msm_io_w(0xF017F3C0, csibase + MIPI_INTERRUPT_MASK);
+//	msm_io_w(0xF017F3C0, csibase + MIPI_INTERRUPT_MASK);
+	msm_io_w(0x3017F3C0, csibase + MIPI_INTERRUPT_MASK);  
+
 	/*clear IRQ bits*/
-	msm_io_w(0xF017F3C0, csibase + MIPI_INTERRUPT_STATUS);
+//	msm_io_w(0xF017F3C0, csibase + MIPI_INTERRUPT_STATUS);
+	msm_io_w(0x3017F3C0, csibase + MIPI_INTERRUPT_STATUS);	
 
 	return rc;
 }

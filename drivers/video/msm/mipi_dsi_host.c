@@ -53,9 +53,7 @@ static spinlock_t dsi_lock;
 static struct list_head pre_kickoff_list;
 static struct list_head post_kickoff_list;
 
-//lcd black out workaround
 int dma_tx_timeout = 0;
-
 void mipi_dsi_init(void)
 {
 	init_completion(&dsi_dma_comp);
@@ -719,7 +717,6 @@ void mipi_dsi_host_init(struct mipi_panel_info *pinfo)
 	//lcd black out workaround
 	mipi_dsi_sw_reset();		
 	printk(KERN_INFO "%s: mipi_dsi_sw_reset .. \n", __func__);	
-
 	if (pinfo->mode == DSI_VIDEO_MODE) {
 		data = 0;
 		if (pinfo->pulse_mode_hsa_he)
@@ -939,6 +936,30 @@ void mipi_dsi_cmd_mdp_sw_trigger(void)
 	wmb();
 }
 
+#if defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+void mipi_dsi_cmd_bta_lgd_only(void)
+{
+	uint32 data;
+	uint32 dsi_ctrl = MIPI_INP(MIPI_DSI_BASE + 0x0000); 
+//-------------------------------------------
+	MIPI_OUTP(MIPI_DSI_BASE + 0x0000, 0x0); // DSI block Disable    
+//-------------------------------------------
+	data = MIPI_INP(MIPI_DSI_BASE + 0x00A8);
+	data = data | BIT(28);  // BIT28 : CLKLN_HS_FORCE_REQUEST
+    MIPI_OUTP(MIPI_DSI_BASE + 0x00A8, data);
+
+	MIPI_OUTP(MIPI_DSI_BASE + 0x094, 0x01); /* trigger */
+	wmb();
+	udelay(10);
+
+	data = MIPI_INP(MIPI_DSI_BASE + 0x00A8);
+	data = data & ~(BIT(28));   // BIT28 : CLKLN_HS_FORCE_REQUEST_CANCLE
+	MIPI_OUTP(MIPI_DSI_BASE + 0x00A8, data);
+//--------------------------------------------
+	MIPI_OUTP(MIPI_DSI_BASE + 0x0000, dsi_ctrl); // DSI block Enable Again 
+//--------------------------------------------
+}
+#endif
 
 void mipi_dsi_cmd_bta_sw_trigger(void)
 {

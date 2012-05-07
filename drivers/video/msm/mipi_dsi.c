@@ -63,8 +63,11 @@ static char *mmss_sfpb_base;	/* mutimedia sub system sfpb */
 static struct platform_device *pdev_list[MSM_FB_MAX_DEV_LIST];
 static int pdev_list_cnt;
 static struct mipi_dsi_platform_data *mipi_dsi_pdata;
-
+#if defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+static int vsync_gpio = 28;
+#else
 static int vsync_gpio = -1;
+#endif
 
 static struct platform_driver mipi_dsi_driver = {
 	.probe = mipi_dsi_probe,
@@ -467,8 +470,6 @@ static int mipi_dsi_off(struct platform_device *pdev)
 
 	mfd = platform_get_drvdata(pdev);
 	pinfo = &mfd->panel_info;
-	
-	//mutex_lock(&mfd->dma->ov_mutex);
 
 	mdp4_overlay_dsi_state_set(ST_DSI_SUSPEND);
 
@@ -478,7 +479,6 @@ static int mipi_dsi_off(struct platform_device *pdev)
 		mdp4_dsi_cmd_dma_busy_wait(mfd);
 		mdp4_dsi_blt_dmap_busy_wait(mfd);
 	}
-	
 /* [I-Pjt/atnt & hdk] minjong.gong@lge.com Start ==> [
   * 2011.03.24, Add code to reset HS mode 
   */
@@ -496,14 +496,24 @@ static int mipi_dsi_off(struct platform_device *pdev)
 
 	mipi_dsi_op_mode_config(DSI_CMD_MODE);
 
+//jinho.jang - useless for video panel
+#ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
 	if (mfd->panel_info.type == MIPI_CMD_PANEL) {
+#elif defined(CONFIG_LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT) || defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+	if (mfd->panel_info.type == MIPI_CMD_PANEL) {
+#endif
 		if (pinfo->lcd.vsync_enable) {
 			if (pinfo->lcd.hw_vsync_mode && vsync_gpio > 0)
 				gpio_free(vsync_gpio);
 
 			mipi_dsi_set_tear_off(mfd);
 		}
+//jinho.jang - useless for video panel
+#ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
 	}
+#elif defined(CONFIG_LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT) || defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+	}
+#endif
 
 	ret = panel_next_off(pdev);
 
@@ -701,8 +711,16 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 
 		if (!mipi_dsi_base)
 			return -ENOMEM;
-
+		
+//jinho.jang - ES2.0 fix -dsi_pclk not on issue
+#ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT		
 		mmss_cc_base = MSM_MMSS_CLK_CTL_BASE;
+#elif defined(CONFIG_LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT) || defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+		mmss_cc_base = MSM_MMSS_CLK_CTL_BASE;
+#else
+		mmss_cc_base =  ioremap(MMSS_CC_BASE_PHY, 0x200);
+#endif
+		
 		MSM_FB_INFO("msm_mmss_cc base = 0x%x\n",
 				(int) mmss_cc_base);
 

@@ -24,16 +24,16 @@
 
 static struct msm_panel_info pinfo;
 
-#define DSI_BIT_CLK_433MHZ
+#define DSI_BIT_CLK_425MHZ
 //#define DSI_BIT_CLK_450MHZ
 //#define DSI_BIT_CLK_392MHZ
 
 static struct mipi_dsi_phy_ctrl dsi_video_mode_phy_db = {
 	/* 720*1280, RGB888, 4 Lane 60 fps video mode */
-#if defined(DSI_BIT_CLK_433MHZ)
+#if defined(DSI_BIT_CLK_425MHZ)
 	{0x03, 0x01, 0x01, 0x00},		/* regulator */
 	//{0x66, 0x26, 0x1B, 0x00, 0x1E, 0x93, 0x1E, 0x8E, 0x1E, 0x03, 0x04}, 	/* timing */
-	{0x66, 0x26, 0x1C, 0x00, 0x1F, 0x93, 0x1E, 0x8E, 0x1F, 0x03, 0x04}, 	/* timing */
+	{0x66, 0x26, 0x1C, 0x00, 0x1F, 0x93, 0x1E, 0x8E, 0x1E, 0x03, 0x04}, 	/* timing */
 	{0x7f, 0x00, 0x00, 0x00},		/* phy ctrl */
 	{0xee, 0x03, 0x86, 0x03},		/* strength */
 	{0x41, 0xB0/*0xA7*/, 0x31, 0xDA, 0x00, 0x50, 0x48, 0x63,		 /* pll control */
@@ -112,12 +112,12 @@ static int __init mipi_video_lgit_wvga_pt_init(void)
 	pinfo.mipi.data_lane1 = TRUE;
 	pinfo.mipi.data_lane2 = TRUE;
 	pinfo.mipi.data_lane3 = TRUE;
-#if defined(DSI_BIT_CLK_433MHZ)
+#if defined(DSI_BIT_CLK_425MHZ)
 	pinfo.mipi.t_clk_post = 0x22;
 	pinfo.mipi.t_clk_pre = 0x35;
-	pinfo.clk_rate = 433560000;
+	pinfo.clk_rate = 425000000;
 	pinfo.mipi.frame_rate = 60;
-#endif /*DSI_BIT_CLK_433MHZ*/
+#endif /*DSI_BIT_CLK_425MHZ*/
 
 #if defined(DSI_BIT_CLK_450MHZ)
 	pinfo.mipi.t_clk_post = 0x22;

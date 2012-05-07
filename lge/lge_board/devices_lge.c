@@ -14,7 +14,6 @@
 
 /* for board revision */
 int lge_bd_rev;
-int lge_bd_target;
 
 #if 0 //remove
 #ifdef CONFIG_LGE_PM_FACTORY_CURRENT_DOWN
@@ -39,28 +38,6 @@ static int __init board_revno_setup(char *rev_info)
 		}
 
 	printk(KERN_INFO "BOARD : LGE %s \n", rev_str[lge_bd_rev]);
-
-/* 20110613 hoyeon.jang@lge.com [START] */
-#ifdef CONFIG_MACH_LGE_I_BOARD
-#ifdef CONFIG_MACH_LGE_I_BOARD_ATNT
-  lge_bd_target = LGE_I_BOARD_ATNT;
-#endif
-#ifdef CONFIG_MACH_LGE_I_BOARD_DCM
-  lge_bd_target = LGE_I_BOARD_DCM;
-#endif
-#ifdef CONFIG_MACH_LGE_I_BOARD_SKT
-  lge_bd_target = LGE_I_BOARD_SKT;
-#endif
-#ifdef CONFIG_MACH_LGE_I_BOARD_VZW
-  lge_bd_target = LGE_I_BOARD_VZW;
-#endif
-#ifdef CONFIG_MACH_LGE_I_BOARD_LGU
-  lge_bd_target = LGE_I_BOARD_LGU;
-#endif
-	printk(KERN_INFO "BOARD : LGE target %d \n", lge_bd_target);
-
-#endif /* CONFIG_MACH_LGE_I_BOARD */
-/* 20110613 hoyeon.jang@lge.com [END] */
 
 	return 1;
 }
@@ -91,17 +68,6 @@ __setup("lge.usb_cable=", board_get_cable_type);
 
 #endif
 #endif
-
-static int __init board_adcadc(char *str_adc)
-{
-  /* CAUTION: */
-  unsigned int val = simple_strtoul(str_adc, NULL, 10);
-
-  printk(KERN_INFO "BOARD : ADC_ADC %d \n", val);
-
-  return 1;
-}
-__setup("lge.adcadc=", board_adcadc);
 
 #ifdef CONFIG_ATCMD_VIRTUAL_KBD
 /* virtual key */

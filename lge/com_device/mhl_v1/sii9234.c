@@ -176,7 +176,7 @@ static ssize_t change_switch_store(struct device *dev, struct device_attribute *
 	printk(KERN_ERR "[MHL_SWITCH] Change the switch: %ld\n", value);
 
 	if (value == 0) {
-		for (i = 0; i <1; i++) {
+		for (i = 0; i <2; i++) {
 			printk(KERN_ERR "[MHL] try %d\n", i+1);
 			msleep(500);
 		}
@@ -530,11 +530,11 @@ static void sii9234_adc_work_func(struct work_struct *work)
 
       if(adc_mhl_detected)
       {
-        //MHL_On(true);
+        MHL_On(true);
       }
       else
       {
-        //MHL_On(false);
+        MHL_On(false);
       }
     }
   }
@@ -600,7 +600,6 @@ static int SII9234_i2c_probe(struct i2c_client *client, const struct i2c_device_
 		&& ( SII9234B_i2cprobe_status == 1) && ( SII9234C_i2cprobe_status == 1))
 	{
 		SII9234_i2c_status = 1;
-		MHL_On(false);
 	}
 
 	printk("ksw sii9234_i2c_read(sii9234_i2c_client, 0x02) = %x\n", SII9234_i2c_read(SII9234_i2c_client, 0x02));
@@ -650,7 +649,6 @@ static int SII9234A_i2c_probe(struct i2c_client *client, const struct i2c_device
 		&& ( SII9234B_i2cprobe_status == 1) && ( SII9234C_i2cprobe_status == 1))
 	{
 		SII9234_i2c_status = 1;
-		MHL_On(false);
 	}
 
 	printk("ksw sii9234_i2c_read(sii9234_i2c_client, 0x02) = %x\n", SII9234_i2c_read(SII9234A_i2c_client, 0x3D));
@@ -694,7 +692,6 @@ static int SII9234B_i2c_probe(struct i2c_client *client, const struct i2c_device
 		&& ( SII9234B_i2cprobe_status == 1) && ( SII9234C_i2cprobe_status == 1))
 	{
 		SII9234_i2c_status = 1;
-		MHL_On(false);
 	}
 
 	printk("ksw sii9234_i2c_read(sii9234_i2c_client, 0x02) = %x\n", SII9234_i2c_read(SII9234B_i2c_client, 0x4C));
@@ -747,7 +744,6 @@ static int SII9234C_i2c_probe(struct i2c_client *client, const struct i2c_device
 		&& ( SII9234B_i2cprobe_status == 1) && ( SII9234C_i2cprobe_status == 1))
 	{
 		SII9234_i2c_status = 1;
-		MHL_On(false);
 	}
 #if 0
 	/* Initialize GPIO 30 (IRQ_MHL_INT).

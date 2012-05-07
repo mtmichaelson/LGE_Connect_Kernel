@@ -75,6 +75,7 @@ extern u16 android_get_product_id(void);
 #endif
 // END sungchae.koo@lge.com 2011/07/14 P1_LAB_BSP }
 
+
 /* Download mode master kill-switch */
 static int dload_set(const char *val, struct kernel_param *kp);
 static int download_mode = 1;
@@ -161,9 +162,9 @@ static void __msm_power_off(int lower_pshold)
 /* for power off charging scenario, when the phone is powered down with key and usb cable, the phone must go to power off charging */
 		writel(0x77665504, restart_reason);
 /* the above error handler is just initialized to remove error handler value. so it is ok that reason is changed except 0x6d~~~ */
+
 	pm8058_reset_pwr_off(0);
 	pm8901_reset_pwr_off(0);
-
 	if (lower_pshold)
 		writel(0, PSHOLD_CTL_SU);
 
@@ -172,7 +173,7 @@ static void __msm_power_off(int lower_pshold)
 	return;
 }
 
-static void msm_power_off(void)
+void msm_power_off(void)
 {
 	/* MSM initiated power off, lower ps_hold */
 	__msm_power_off(1);
@@ -329,12 +330,14 @@ static int __init msm_restart_init(void)
 
 // START sungchae.koo@lge.com 2011/07/14 P1_LAB_BSP : 56K_DLOAD_TRANSITION {
 #ifdef CONFIG_LGE_USB_FACTORY
-    dload_hsu_info_addr = dload_mode_addr + SHARED_IMEM_BOOT_SIZE;
+	dload_hsu_info_addr = dload_mode_addr + SHARED_IMEM_BOOT_SIZE;
 #endif
 // END sungchae.koo@lge.com 2011/07/14 P1_LAB_BSP }
 
 	/* Reset detection is switched on below.*/
-    //	set_dload_mode(1);
+#if 0 //byongdoo.oh@lge.com for j-tag debugging. this make phone state enter into dload mode in SBL3
+    set_dload_mode(1);
+#endif
 #endif
 	restart_reason = imem + RESTART_REASON_ADDR;
 	pm_power_off = msm_power_off;
@@ -353,7 +356,7 @@ static int __init msm_restart_init(void)
 	/* neo.kang@lge.com 2011-06-01
 	 * add the error handler */
         /* byongdoo.oh@lge.com do not use unknown crash. there is so many kind of reset */
-#if 0
+#ifdef CONFIG_LGE_FEATURE_RELEASE
 #if defined(CONFIG_LGE_ERROR_HANDLER)
         writel(0x6d63ad00, restart_reason);
         set_dload_mode(0);

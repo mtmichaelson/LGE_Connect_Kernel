@@ -285,10 +285,8 @@ static ssize_t hdmi_common_wta_hpd(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	ssize_t ret = strnlen(buf, PAGE_SIZE);
+	int hpd = atoi(buf);
 
-#ifndef CONFIG_LGE_MHL_SII9244	
-	int hpd = atoi(buf);  
-	
 	if (external_common_state->hpd_feature) {
 		if (hpd == 0 && external_common_state->hpd_feature_on) {
 			external_common_state->hpd_feature(0);
@@ -307,7 +305,6 @@ static ssize_t hdmi_common_wta_hpd(struct device *dev,
 	} else {
 		DEV_DBG("%s: 'not supported'\n", __func__);
 	}
-#endif //CONFIG_LGE_MHL_SII9244	
 
 	return ret;
 }
@@ -1228,11 +1225,7 @@ bool hdmi_common_get_video_format_from_drv_data(struct msm_fb_data_type *mfd)
 				: HDMI_VFRMT_1440x576i50_16_9;
 			break;
 		case 1920:
-#ifdef CONFIG_LGE_MHL_SII9244
-			format = HDMI_VFRMT_1920x1080p30_16_9;
-#else
 			format = HDMI_VFRMT_1920x1080p60_16_9;
-#endif
 			break;
 		}
 	}
@@ -1295,8 +1288,7 @@ void hdmi_common_init_panel_info(struct msm_panel_info *pinfo)
 	pinfo->pdest = DISPLAY_2;
 	pinfo->wait_cycle = 0;
 	pinfo->bpp = 24;
-	//pinfo->fb_num = 1;  // original code
-	pinfo->fb_num = 2;   // for double buffering
+	pinfo->fb_num = 1;
 
 	/* blk */
 	pinfo->lcdc.border_clr = 0;
@@ -1305,51 +1297,4 @@ void hdmi_common_init_panel_info(struct msm_panel_info *pinfo)
 	pinfo->lcdc.hsync_skew = 0;
 }
 EXPORT_SYMBOL(hdmi_common_init_panel_info);
-
-
-#ifdef CONFIG_LGE_MHL_SII9244  /* chanhee.park@lge.com */
-void hdmi_common_send_uevent(char *buf)
-{
-	char *envp[2];
-	int env_offset = 0;
-
-	envp[env_offset++] = buf;
-	envp[env_offset] = NULL;
-	
-	kobject_uevent_env(external_common_state->uevent_kobj,KOBJ_CHANGE, envp); 
-}
-
-EXPORT_SYMBOL(hdmi_common_send_uevent);
-
-/* I-project scenario - HPD on when MHL cable is detected
-*/
-
-extern boolean hdmi_msm_panel_power(void);
-
-void hdmi_common_set_hpd(int on)
-{
-	int count = 0;
-	
-	if(on == 1){
-		for(count = 0 ; count < 100 ; count++){
-			if(!hdmi_msm_panel_power()){
-				DEV_DBG("hdmi_common_set_hpd: count[%d]\n",count);
-				break;
-			}
-			msleep(10);
-		}
-		 			
-		external_common_state->hpd_feature(1);		
-		external_common_state->hpd_feature_on = 1;
-		external_common_state->cable_connected = 0;
-	}
-	else{
-		//external_common_state->hpd_feature(0);		
-		external_common_state->hpd_feature_on = 0;
-	}
-}
-
-EXPORT_SYMBOL(hdmi_common_set_hpd);
-
-#endif  // CONFIG_LGE_MHL_SII9244 
 #endif

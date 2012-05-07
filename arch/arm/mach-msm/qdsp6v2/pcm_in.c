@@ -66,13 +66,15 @@ void pcm_in_cb(uint32_t opcode, uint32_t token,
 {
 	struct pcm *pcm = (struct pcm *) priv;
 	unsigned long flags;
-
+	pr_info(" %s\n", __func__);
 	spin_lock_irqsave(&pcm->dsp_lock, flags);
 	switch (opcode) {
 	case ASM_DATA_EVENT_READ_DONE:
 		pcm_in_get_dsp_buffers(pcm, token, payload);
 		break;
 	default:
+	pr_info("%s:session id %d: Ignore opcode[0x%x]\n", __func__,
+			pcm->ac->session, opcode);
 		break;
 	}
 	spin_unlock_irqrestore(&pcm->dsp_lock, flags);
@@ -129,8 +131,8 @@ static int config(struct pcm *pcm)
 {
 	int rc = 0;
 
-	pr_debug("%s: pcm prefill, buffer_size = %d\n", __func__,
-		pcm->buffer_size);
+	pr_info("%s: pcm prefill, buffer_size = %d sample rate = %d channel count =%d \n", __func__,
+		pcm->buffer_size, pcm->sample_rate, pcm->channel_count);
 	rc = q6asm_audio_client_buf_alloc(OUT, pcm->ac,
 				pcm->buffer_size, pcm->buffer_count);
 	if (rc < 0) {
@@ -298,7 +300,7 @@ static long pcm_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		pr_debug("%s: In-call rec_mode %d\n", __func__, pcm->rec_mode);
+		pr_info("%s: In-call rec_mode %d\n", __func__, pcm->rec_mode);
 		break;
 	}
 
@@ -317,6 +319,7 @@ static int pcm_in_open(struct inode *inode, struct file *file)
 	char name[24];
 
 	pcm = kzalloc(sizeof(struct pcm), GFP_KERNEL);
+	pr_info(" %s \n", __func__);
 	if (!pcm)
 		return -ENOMEM;
 
@@ -378,6 +381,7 @@ static ssize_t pcm_in_read(struct file *file, char __user *buf,
 
 	if (!atomic_read(&pcm->in_enabled))
 		return -EFAULT;
+//		pr_info(" %s \n", __func__);
 	mutex_lock(&pcm->read_lock);
 	while (count > 0) {
 		rc = wait_event_timeout(pcm->wait,

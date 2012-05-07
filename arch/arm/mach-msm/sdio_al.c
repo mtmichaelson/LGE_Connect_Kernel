@@ -20,7 +20,8 @@
  *
  * To be used with Qualcomm's SDIO-Client connected to this host.
  */
-#include <sdio_al_private.h>
+//#include <sdio_al_private.h>
+#include "sdio_al_private.h"
 
 #include <linux/module.h>
 #include <linux/scatterlist.h>
@@ -111,10 +112,6 @@
  *  packet) rx data.
  */
 #define DEFAULT_READ_THRESHOLD  	(1024)
-/* Extra bytes to ensure getting the rx threshold interrupt on stream channels
-   when restoring the threshold after sleep */
-#define THRESHOLD_CHANGE_EXTRA_BYTES (100)
-
 
 /* Extra bytes to ensure getting the rx threshold interrupt on stream channels
    when restoring the threshold after sleep */
@@ -430,8 +427,7 @@ enum peer_op_state {
  * sdio_al.debug_lpm_on=1 to enable the LPM debug messages
  * By default the LPM debug messages are turned off
  */
-/* byongdoo.oh@lge.com remove kernel debug message change debug_lpm_on 1 to 0 */
-static int debug_lpm_on = 0;
+static int debug_lpm_on;
 module_param(debug_lpm_on, int, 0);
 
 /*
@@ -817,7 +813,9 @@ static void sdio_al_sleep(struct sdio_al_device *sdio_al_dev,
  */
 #ifndef CONFIG_LGE_KERNEL_SYSTEM_STATE
  extern int lge_get_kernel_shutdown_nofityed(void);  
+extern void arch_reset(char mode, const char *cmd);
 #endif
+
 static int read_mailbox(struct sdio_al_device *sdio_al_dev, int from_isr)
 {
 	int ret;
@@ -837,18 +835,6 @@ static int read_mailbox(struct sdio_al_device *sdio_al_dev, int from_isr)
 	u32 underflow_pipe = 0;
 	u32 thresh_intr_mask = 0;
 	int is_closing = 0;
-
-        #if 0
-	#ifndef CONFIG_LGE_KERNEL_SYSTEM_STATE  // 
-	// ignore  rmt_storage  call  in case system  is in shutdown.  get this hint  form vs910 
-	//  kernel crassh  detected in  factory reset  QM3 TD#[ 23101]
-	 if(lge_get_kernel_shutdown_nofityed() == 1)
-   	{  
-   	printk(KERN_DEBUG "shutdown has already been notified, ignore it!\n"); 
-	return 0;
-    	}
-	#endif
-	#endif
 
 	if (sdio_al_dev->is_err) {
 		SDIO_AL_ERR(__func__);
@@ -898,6 +884,15 @@ static int read_mailbox(struct sdio_al_device *sdio_al_dev, int from_isr)
 				   "state %d\n",
 				sdio_al_dev->card->host->index,
 				sdio_al_dev->state);
+#ifndef CONFIG_LGE_KERNEL_SYSTEM_STATE
+		// ignore  rmt_storage  call  in case system  is in shutdown.  get this hint  form vs910 
+		//  kernel crassh  detected in  factory reset  QM3 TD#[ 23101]
+		if(lge_get_kernel_shutdown_nofityed() == 1)
+   		{  
+ 	  		printk(KERN_DEBUG "shutdown has already been notified, ignore it!and going to reset \n"); 
+			arch_reset(0,NULL);
+ 	    }
+#endif
 		return -ENODEV;
 	}
 
@@ -1044,16 +1039,8 @@ static int read_mailbox(struct sdio_al_device *sdio_al_dev, int from_isr)
 				sdio_al_dev->card->host->index, is_closing);
 		if (is_closing)
 			restart_inactive_time(sdio_al_dev);
-#ifndef QCT_TEST
-		else
-		{
-			LPM_DEBUG(MODULE_NAME ":read mailbox : starting sdio_al_sleep ");
-			sdio_al_sleep(sdio_al_dev, host);
-		}
-#else		
 		else if (is_inactive_time_expired(sdio_al_dev))
 			sdio_al_sleep(sdio_al_dev, host);
-#endif		
 	} else {
 		DATA_DEBUG(MODULE_NAME ":Notify bitmask for card %d "
 				       "rx=0x%x, tx=0x%x.\n",

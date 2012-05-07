@@ -12,6 +12,7 @@ obj-$(CONFIG_LGE_FACTORY) += lge_emmc_direct_access.o
 obj-$(CONFIG_LGE_FACTORY) += userDataBackUpDiag.o
 obj-$(CONFIG_LGE_FACTORY) += lge_diag_eri.o
 obj-$(CONFIG_LGE_FACTORY) += lg_diag_dload.o
+obj-$(CONFIG_LGE_FACTORY) += lg_diag_event_log.o
 
 obj-$(CONFIG_LGE_BOARD_SUPPORT) += devices_lge.o
 obj-$(CONFIG_LGE_ERROR_HANDLER) += lge_test.o

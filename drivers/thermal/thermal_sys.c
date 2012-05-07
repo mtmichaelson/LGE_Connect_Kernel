@@ -1087,14 +1087,12 @@ void thermal_zone_device_update(struct thermal_zone_device *tz)
 				if (tz->ops->notify)
 					ret = tz->ops->notify(tz, count,
 								trip_type);
-#if 0 //byongdoo.oh@lge.com 2011.09.24 Do not turn off even if target's temperature is under -20C		    
 			if (!ret) {
 				printk(KERN_EMERG
 				"Critical temperature reached (%ld C), \
 					shutting down.\n", temp/1000);
 				orderly_poweroff(true);
 				}
-#endif
 			}
 			break;
 		case THERMAL_TRIP_ACTIVE:

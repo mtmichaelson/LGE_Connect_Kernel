@@ -130,4 +130,7 @@ typedef void (*notify_vbus_state) (int);
 int msm_charger_register_vbus_sn(void (*callback)(int));
 void msm_charger_unregister_vbus_sn(void (*callback)(int));
 
+void testmode_charging_mode_test(void);
+void testmode_discharging_mode_test(void);
+
 #endif /* __MSM_CHARGER_H__ */

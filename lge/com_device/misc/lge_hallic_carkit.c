@@ -101,12 +101,6 @@ void hall_ic_dock_report_event(int state)
 }
 EXPORT_SYMBOL(hall_ic_dock_report_event);
 
-int hall_ic_get_dock_state(void)
-{
-	return reported_dock_state;
-}
-
-EXPORT_SYMBOL(hall_ic_get_dock_state);
 #if 0
 static void hall_timer(unsigned long arg)
 {

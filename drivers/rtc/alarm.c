@@ -97,13 +97,8 @@ static void update_timer_locked(struct alarm_queue *base, bool head_removed)
 	}
 
 	hrtimer_try_to_cancel(&base->timer);
-#if 0//def LGE_KERNEL_ALARM_SANITY_CHECK
 	base->timer._expires = ktime_add(base->delta, alarm->expires);
 	base->timer._softexpires = ktime_add(base->delta, alarm->softexpires);
-#else
-	base->timer._expires = ktime_add_safe(base->delta, alarm->expires);
-	base->timer._softexpires = ktime_add_safe(base->delta, alarm->softexpires);
-#endif
 	hrtimer_start_expires(&base->timer, HRTIMER_MODE_ABS);
 }
 

@@ -13,10 +13,24 @@ comment "Camera Sensor Selection"
 config LGE_SENSOR_IMX105
 	bool "Sensor IMX105 8MP MIPI (BAYER 8M)"
 	depends on MSM_CAMERA && ARCH_MSM8X60
-	default y
+	default n
 	---help---
 	SONY 8M Bayer MIPI Sensor with Autofocus
-	  	  
+
+config LGE_SENSOR_MT9P017
+	bool "Sensor MT9P017 5MP MIPI (BAYER 5M)"
+	depends on MSM_CAMERA && ARCH_MSM8X60
+	default y
+	---help---
+	APTINA 5M Bayer MIPI Sensor with Autofocus
+
+config LGE_SENSOR_MT9V113
+	bool "Sensor MT9V113 VGA MIPI (SOC 0.3M)"
+	depends on MSM_CAMERA && ARCH_MSM8X60
+	default y
+	---help---
+	APTINA 0.3M SOC MIPI Sensor
+
 config LGE_SENSOR_ISX005
 	bool "Sensor isx005 (YUV 3M)"
 	#depends on MSM_CAMERA && !ARCH_MSM8X60
@@ -41,16 +55,23 @@ config LGE_SENSOR_MT9M113
 config LGE_SENSOR_MT9M114
 	bool "Sensor MT9M114 1.26MP MIPI (SOC 1.26M)"
 	depends on MSM_CAMERA && ARCH_MSM8X60
-	default y
+	default n
 	---help---
 	APTINA 1.26M SOC MIPI Sensor without Autofocus	
 
 config VTCAM_SD_IMAGE_TUNNING
 	bool "SD Card Image Tuning for MT9M114"
 	depends on LGE_SENSOR_MT9M114
-	default y
+	default n
 	---help---
 	SD Card Image Tuning for MT9M114
+
+config VTCAM_SD_IMAGE_TUNNING_FOR_MT9V113
+	bool "SD Card Image Tuning for MT9V113"
+	depends on LGE_SENSOR_MT9V113
+	default y
+	---help---
+	SD Card Image Tuning for MT9V113
 
 comment "Camera flash Selection"
 	  	  

@@ -1506,13 +1506,4 @@ config LGE_SDIO_DEBUG_CH
 	help
 	  Support Debug Channels over SDIO interface.
 	  
-# LGE_CHANGE_S [seunghun.kim@lge.com] 2011-05-18, support QCOM two-modem driver
-config LGE_USB_TEMP_SUPPORT_QCOM_TWO_MODEM
-	boolean "support QCOM two-modem Driver"
-	depends on USB_GADGET
-	help
-	  It supports QCOM two-modem for SFN.
-	default n
-# LGE_CHANGE_E [seunghun.kim@lge.com] 2011-05-18
-
 endif

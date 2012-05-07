@@ -48,8 +48,8 @@
 #include "mdp.h"
 #include "mdp4.h"
 
-//add msm_rotator_control_status
-#undef MSM_ROTATOR_IOCTL_CHECK
+//jinho.jang - add msm_rotator_control_status
+#define MSM_ROTATOR_IOCTL_CHECK
 
 #ifdef MSM_ROTATOR_IOCTL_CHECK
 #include <mach/board_lge.h>
@@ -59,7 +59,8 @@ static int rotate_result = 0;
 #endif
 
 #ifdef CONFIG_FB_MSM_LOGO
-//initialization at bootloader
+
+// jinho.jang - initialization at bootloader
 #ifdef CONFIG_LGE_BOOTLOADER_DISP_INIT
 static int boot_cnt = 0;
 #define INIT_IMAGE_FILE "/bootimages/boot_logo_00000.rle"
@@ -179,10 +180,15 @@ int msm_fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 
 static int msm_fb_resource_initialized;
 
-/* LGE_CHANGE - HD LCD */
+/* LGE_CHANGE : jinho.jang 2011.02.10 - HD LCD */
 #ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
 static struct msm_fb_data_type *local_mfd;
 static int saved_backlight_level = 0x33;
+static int is_backlight_on = 0;
+#elif defined(CONFIG_LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT) || defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+static struct msm_fb_data_type *local_mfd;
+static int saved_backlight_level = 55;
+static int is_backlight_on = 0;
 #endif
 
 #ifndef CONFIG_FB_BACKLIGHT
@@ -205,8 +211,20 @@ static void msm_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	if (!bl_lvl && value)
 		bl_lvl = 1;
 
+/* LGE_CHANGE : jinho.jang 2011.02.10 - HD LCD */
 #ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
 	saved_backlight_level = bl_lvl;
+
+	MSM_FB_DEBUG("\n msm_fb_set_bl_brightness : bl level = %d \n", saved_backlight_level);
+	if(!mfd->panel_power_on)
+	{
+		MSM_FB_DEBUG("\n msm_fb_set_bl_brightness : panel power is not on : bl level = %d \n", bl_lvl);
+		return;
+	}
+#elif defined(CONFIG_LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT) || defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+	saved_backlight_level = bl_lvl;
+
+	MSM_FB_DEBUG("\n msm_fb_set_bl_brightness : bl level = %d \n", saved_backlight_level);
 
 	if(!mfd->panel_power_on)
 	{
@@ -327,6 +345,7 @@ static void msm_fb_remove_sysfs(struct platform_device *pdev)
 	sysfs_remove_group(&mfd->fbi->dev->kobj, &msm_fb_attr_group);
 }
 
+/* LGE_CHANGE : jinho.jang 2011.02.10 - HD LCD */
 #ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
 ssize_t msm_fb_lgit_lcd_show_onoff(struct device *dev,  struct device_attribute *attr, char *buf)
 {
@@ -346,7 +365,7 @@ ssize_t msm_fb_lgit_lcd_store_onoff(struct device *dev, struct device_attribute 
 		msm_fb_blank_sub(FB_BLANK_UNBLANK, local_mfd->fbi,
 				      local_mfd->op_enable);		
 		mdelay(100);
-		msm_fb_set_backlight(local_mfd, saved_backlight_level);
+		msm_fb_set_backlight(local_mfd, 55);
 		printk("%s: buf %s, lcd on : %d\n", __func__,buf, onoff);
 	}
 	else {
@@ -359,6 +378,39 @@ ssize_t msm_fb_lgit_lcd_store_onoff(struct device *dev, struct device_attribute 
 }
 
 DEVICE_ATTR(msm_fb_lcd_onoff, 0644, msm_fb_lgit_lcd_show_onoff, msm_fb_lgit_lcd_store_onoff);
+
+#elif defined(CONFIG_LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT) || defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+ssize_t msm_fb_lgd_lcd_show_onoff(struct device *dev,  struct device_attribute *attr, char *buf)
+{
+	printk("%s : strat\n", __func__);
+	return 0;
+}
+
+ssize_t msm_fb_lgd_lcd_store_onoff(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	int onoff;	
+
+	sscanf(buf, "%d", &onoff);
+	
+	local_mfd->op_enable = 1;
+	
+	if(onoff) {
+		msm_fb_blank_sub(FB_BLANK_UNBLANK, local_mfd->fbi,
+				      local_mfd->op_enable);
+		msm_fb_set_backlight(local_mfd, 55);
+		printk("%s: buf %s, lcd on : %d\n", __func__,buf, onoff);
+	}
+	else {
+		msm_fb_set_backlight(local_mfd, 0);
+		msm_fb_blank_sub(FB_BLANK_POWERDOWN, local_mfd->fbi,
+				      local_mfd->op_enable);		
+		printk("%s: buf %s, lcd off : %d\n", __func__,buf, onoff);
+	}
+	return 0;
+}
+
+DEVICE_ATTR(msm_fb_lcd_onoff, 0644, msm_fb_lgd_lcd_show_onoff, msm_fb_lgd_lcd_store_onoff);
+
 #endif
 
 static int msm_fb_probe(struct platform_device *pdev)
@@ -685,7 +737,6 @@ static void memset32_io(u32 __iomem *_ptr, u32 val, size_t count)
 #endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-
 static void msmfb_early_suspend(struct early_suspend *h)
 {
 	struct msm_fb_data_type *mfd = container_of(h, struct msm_fb_data_type,
@@ -715,7 +766,8 @@ static void msmfb_early_resume(struct early_suspend *h)
 {
 	struct msm_fb_data_type *mfd = container_of(h, struct msm_fb_data_type,
 						    early_suspend);
-						    
+
+
 	msm_fb_resume_sub(mfd);
 }
 #endif
@@ -794,6 +846,11 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 
 			msm_fb_set_backlight(mfd, 0);		
 			mfd->op_enable = TRUE;
+#ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
+			is_backlight_on = 0;
+#elif defined(CONFIG_LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT) || defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+			is_backlight_on = 0;
+#endif
 		}
 		break;
 	}
@@ -1148,7 +1205,7 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	var->yres_virtual = panel_info->yres * mfd->fb_page;
 	var->bits_per_pixel = bpp * 8;	/* FrameBuffer color depth */
 	if (mfd->dest == DISPLAY_LCD) {
-		// fps define (CTS test) 
+		// jinho.jang - fps define (CTS test) 
 		if(mfd->panel_info.type == MIPI_VIDEO_PANEL)
 			var->reserved[4] = panel_info->mipi.frame_rate;
 		else
@@ -1264,21 +1321,21 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	if(mfd->panel_info.type == MIPI_VIDEO_PANEL) {
 		local_mfd = mfd;
 
-		msm_fb_blank_sub(FB_BLANK_UNBLANK, mfd->fbi, mfd->op_enable);
-		mdelay(100);	
+		//msm_fb_blank_sub(FB_BLANK_UNBLANK, mfd->fbi, mfd->op_enable);
+		//mdelay(100);	
 		msm_fb_set_backlight(mfd, saved_backlight_level);
-		printk("%s: backlight set level : %d\n", __func__,saved_backlight_level);
+		//printk("%s: backlight set level : %d\n", __func__,saved_backlight_level);
 		
 	}
 #endif
-	//2011.08.30 remove kernel initial image and disply it in bootlogo 
-	//if (!load_565rle_image(INIT_IMAGE_FILE)) ;	/* Flip buffer */
+//	if (!load_565rle_image(INIT_IMAGE_FILE)) ;	/* Flip buffer */
 
 #endif
 	ret = 0;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-        if (mfd->panel_info.type != DTV_PANEL) {
+	 //  HDMI sleep issue fix 
+	if (mfd->panel_info.type != DTV_PANEL) {
 		mfd->early_suspend.suspend = msmfb_early_suspend;
 		mfd->early_suspend.resume = msmfb_early_resume;
 		mfd->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 2;
@@ -1452,7 +1509,6 @@ static int msm_fb_release(struct fb_info *info, int user)
 		return 0;
 	}
 #endif
-
 	if (!mfd->ref_cnt) {
 		MSM_FB_INFO("msm_fb_release: try to close unopened fb %d!\n",
 			    mfd->index);
@@ -1548,10 +1604,18 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 	mdp_dma_pan_update(info);
 	up(&msm_fb_pan_sem);
 
-/* to confirm after update completion */
+/* LGE_CHANGE : jinho.jang 2011.04.22 - to confirm after update completion */
 #ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
-	if(mfd->bl_level == 0) {
+	if(is_backlight_on == 0) {
+		mdelay(80);
 		msm_fb_set_backlight(mfd, saved_backlight_level);
+		is_backlight_on = 1;
+	}
+#elif defined(CONFIG_LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT) || defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+	if(is_backlight_on == 0) {
+		mdelay(80);
+		msm_fb_set_backlight(mfd, saved_backlight_level);
+		is_backlight_on = 1;
 	}
 #endif
 
@@ -2608,15 +2672,14 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 
 	if (mfd->overlay_play_enable == 0)	/* nothing to do */
 		return 0;
-
-// to check rotation change during camera is running
+	
+// to block broken image during camera is running
 #ifdef MSM_ROTATOR_IOCTL_CHECK
 	if((get_rotator_ctl_result() == NO_ROTATE) &&
-		is_imx105_sensor_open()) {
-		printk(KERN_INFO "rotation is not changed in msm_rotator , calling function is queuebuffer .... \n");
+		is_mt9p017_sensor_open()) {
+		//printk("__debug %s will be returned for rotation fail.... \n",__func__);
 	}
 #endif
-
 	ret = copy_from_user(&req, argp, sizeof(req));
 	if (ret) {
 		printk(KERN_ERR "%s:msmfb_overlay_play ioctl failed \n",
@@ -2682,6 +2745,8 @@ static int msmfb_overlay_rotator(struct fb_info *info, unsigned long *argp)
 
 	ret = copy_from_user(&enable, argp, sizeof(enable));	
 	if (ret) {
+	//	printk(KERN_ERR "%s:msmfb_overlay_rotator ioctl failed\n",
+	//		__func__);
 		return ret;
 	}
 
@@ -3164,7 +3229,7 @@ struct platform_device *msm_fb_add_device(struct platform_device *pdev)
 	 *
 	 */
 	if (type == HDMI_PANEL || type == DTV_PANEL || type == TV_PANEL)
-		pdata->panel_info.fb_num = 2;//1;
+		pdata->panel_info.fb_num = 1;
 	else
 		pdata->panel_info.fb_num = MSM_FB_NUM;
 

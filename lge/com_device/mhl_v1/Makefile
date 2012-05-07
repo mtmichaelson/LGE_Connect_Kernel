@@ -1,10 +1,16 @@
+# drivers/media/video/samsung/mhl_v1/Makefile
+#
+# Copyright (c) 2010 Samsung Electronics Co., Ltd.
+# 		http://www.samsung.com/
+# Aakash Manik
+#	aakash.manik@samsung.com
 
-EXTRA_CFLAGS += -Ilge/include
 
-obj-$(CONFIG_LGE_MHL_SII9244) += sii9244.o \
+
+obj-$(CONFIG_VIDEO_MHL_V1) += sii9234.o \
 				si_RegioCbus.o \
-				SiI9244_I2C_master.o \
-				sii9244_driver.o \
+				SiI9234_I2C_master.o \
+				sii9234_driver.o \
 				si_apiCbus.o \
 				si_cpCbus.o 
 

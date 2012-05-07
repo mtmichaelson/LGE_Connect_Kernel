@@ -198,6 +198,7 @@ extern int pm_chg_auto_disable(int value);
 
 #ifdef CONFIG_LGE_AT_COMMAND_ABOUT_POWER
 static bool b_is_at_cmd_on = false;
+static bool b_is_testmode_cmd_on = false;
 #endif
 
 static int is_chg_capable_of_charging(struct msm_hardware_charger_priv *priv)
@@ -212,7 +213,7 @@ static int is_chg_capable_of_charging(struct msm_hardware_charger_priv *priv)
 static int is_batt_status_capable_of_charging(void)
 {
 #ifdef CONFIG_LGE_AT_COMMAND_ABOUT_POWER
-  if(b_is_at_cmd_on)
+  if(b_is_at_cmd_on || b_is_testmode_cmd_on)
     return 1;
   else
   {
@@ -244,7 +245,7 @@ static int is_batt_status_charging(void)
 static int is_battery_present(void)
 {
 #ifdef CONFIG_LGE_AT_COMMAND_ABOUT_POWER
-  if(b_is_at_cmd_on)
+  if(b_is_at_cmd_on || b_is_testmode_cmd_on)
     return 1;
   else
   {
@@ -274,7 +275,7 @@ static int is_battery_present(void)
 static int is_battery_temp_within_range(void)
 {
 #ifdef CONFIG_LGE_AT_COMMAND_ABOUT_POWER
-  if(b_is_at_cmd_on)
+  if(b_is_at_cmd_on || b_is_testmode_cmd_on)
     return 1;
   else
   {
@@ -298,7 +299,7 @@ static int is_battery_temp_within_range(void)
 static int is_battery_id_valid(void)
 {
 #ifdef CONFIG_LGE_AT_COMMAND_ABOUT_POWER
-  if(b_is_at_cmd_on)
+  if(b_is_at_cmd_on || b_is_testmode_cmd_on)
     return 1;
   else
   {
@@ -364,6 +365,37 @@ static int get_battery_temperature_adc(void)
 	}
 }
 
+#endif
+
+/* elin.lee@lge.com 2011-12-01 for camera flash current under 5 below zero, PV issue*/		
+#ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
+int is_temp_too_cold(void)
+{
+		int chg_batt_temp;
+		int rtnValue = 0;
+		int temp_adc;
+		temp_adc = get_battery_temperature_adc();
+	
+		printk("%s: START \n",__func__);
+		
+		if(temp_adc < adcmap_batttherm[THERM_55].x)
+		  chg_batt_temp = CHG_BATT_TEMP_OVER_55;
+		else if(temp_adc < adcmap_batttherm[THERM_45].x)
+		  chg_batt_temp = CHG_BATT_TEMP_46_55;
+		else if(temp_adc <= adcmap_batttherm[THERM_42].x)
+		  chg_batt_temp = CHG_BATT_TEMP_42_45;
+		else if(temp_adc < adcmap_batttherm[THERM_M5].x)
+		  chg_batt_temp = CHG_BATT_TEMP_M4_41;
+		else if(temp_adc <= adcmap_batttherm[THERM_M10].x)
+		  chg_batt_temp = CHG_BATT_TEMP_M10_M5;
+		else
+		  chg_batt_temp = CHG_BATT_TEMP_UNDER_M10;
+
+		if(chg_batt_temp == CHG_BATT_TEMP_M10_M5 || chg_batt_temp == CHG_BATT_TEMP_UNDER_M10)
+			rtnValue = 1;
+
+		return rtnValue;	
+}
 #endif
 
 static int get_prop_batt_capacity(void)
@@ -435,8 +467,7 @@ static int get_prop_batt_status(void)
 #endif
 	else if (msm_chg.batt_status ==
 		 BATT_STATUS_JUST_FINISHED_CHARGING
-			 && msm_chg.current_chg_priv != NULL
-			 &&(get_prop_batt_capacity() >= 95))
+		 && msm_chg.current_chg_priv != NULL && msm_batt_gauge->get_hw_fsm_state() != 3)
 		status = POWER_SUPPLY_STATUS_FULL;
 #ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
 	/* in case of booting with TA without battery, the battery icon set'*/
@@ -542,7 +573,7 @@ static enum power_supply_property msm_batt_power_props[] = {
 #endif
 };
 /* hyungsic.you we can't read cable type so must add check cable type later*/
-#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
+#if 1//def CONFIG_LGE_PM_BATTERY_ID_CHECKER
 extern uint16_t battery_info_get(void);
 #endif
 #ifdef CONFIG_LGE_PM_FACTORY_CURRENT_DOWN
@@ -613,12 +644,11 @@ static int msm_batt_power_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CAPACITY:
 /* hyungsic.you we can't read cable type so must add check cable type later*/
 #ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
-	if((0 == battery_info_get())&&((6 ==get_ext_cable_type_value())||(7 == get_ext_cable_type_value()))) /* 6,7 = LT cable*/
-		val->intval = 70;//for test only
+	if((6 ==get_ext_cable_type_value())||(7 ==get_ext_cable_type_value())) /* 6,7 = LT cable*/
+		val->intval = 100;//for test only
 	else if(msm_chg.batt_status ==
 		 BATT_STATUS_JUST_FINISHED_CHARGING
-			 && msm_chg.current_chg_priv != NULL
-			 &&(get_prop_batt_capacity() >= 95))
+		 && msm_chg.current_chg_priv != NULL && msm_batt_gauge->get_hw_fsm_state() != 3)
 		val->intval = 100;
 	else
 #endif       
@@ -637,7 +667,7 @@ static int msm_batt_power_get_property(struct power_supply *psy,
 #endif
 
 #ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
-	case POWER_SUPPLY_PROP_TEMP: // tempï¿½ï¿½ ï¿½Âµï¿½ ï¿½ï¿½ 
+	case POWER_SUPPLY_PROP_TEMP: // temp´Â ¿Âµµ °ª 
 	  if(pseudo_batt_info.mode == 1)
 		val->intval = pseudo_batt_info.temp*10;	  
 	  else if((6 ==get_ext_cable_type_value()) || (7 ==get_ext_cable_type_value()))
@@ -646,7 +676,7 @@ static int msm_batt_power_get_property(struct power_supply *psy,
 		val->intval = get_battery_temperature()*10;
 	  break;
 
-	case POWER_SUPPLY_PROP_BATTERY_TEMP_ADC: // ï¿½Âµï¿½ ADC ï¿½ï¿½. 
+	case POWER_SUPPLY_PROP_BATTERY_TEMP_ADC: // ¿Âµµ ADC °ª. 
     if(pseudo_batt_info.mode == 1)
       val->intval = pseudo_batt_info.therm;
     else
@@ -672,7 +702,7 @@ static int msm_batt_power_get_property(struct power_supply *psy,
 #endif
 #ifdef CONFIG_LGE_PM_FACTORY_CURRENT_DOWN
     case POWER_SUPPLY_PROP_FACTORY_MODE:
-      if((0 == battery_info_get())&&((usb_cable_info == 6) ||(usb_cable_info == 7)||(usb_cable_info == 11)))
+      if((usb_cable_info == 6) ||(usb_cable_info == 7)||(usb_cable_info == 11))
 	  {
 	   // printk(KERN_DEBUG "############ Factory Mode #####################\n");
 	    val->intval = 1;
@@ -1083,7 +1113,6 @@ static int chg_is_battery_too_hot_or_too_cold(int temp_adc, int batt_level)
             }
 			
 			rtnValue = 0;
-
 			if(get_ext_cable_type_value() == MHL_CABLE_500MA)
 				pm_chg_imaxsel_set(500);
 			else if(get_ext_cable_type_value() == TA_CABLE_600MA)
@@ -1196,7 +1225,6 @@ static int chg_is_battery_too_hot_or_too_cold(int temp_adc, int batt_level)
 	        }
 			
 			rtnValue = 0;			
-
 			if(get_ext_cable_type_value() == MHL_CABLE_500MA)
 				pm_chg_imaxsel_set(500);
 			else if(get_ext_cable_type_value() == TA_CABLE_600MA)
@@ -1233,7 +1261,7 @@ static int chg_is_battery_too_hot_or_too_cold(int temp_adc, int batt_level)
 				get_ext_cable_type_value() == TA_CABLE_DTC_800MA ||				
 				get_ext_cable_type_value() == TA_CABLE_FORGED_500MA
 				)
-				pm_chg_imaxsel_set(400);
+				pm_chg_imaxsel_set(450);
         }
 */        
         else
@@ -1452,11 +1480,11 @@ int lge_skip_stop_charging_with_factory_condition( void )
     acc_cable_type ext_cable_type;
     printk(KERN_DEBUG "%s: entered\n",__func__);
 
-    if(0 != battery_info_get())
-    {
-        printk(KERN_DEBUG "%s: battery is present! ignore factory condition\n",__func__);
-        return DO_STOP_CHARGING;
-    }
+	if(0 != battery_info_get())
+	{
+		printk(KERN_DEBUG "%s: battery is present! ignore factory condition\n",__func__);
+	    return DO_STOP_CHARGING;
+	}
 
     ext_cable_type = get_ext_cable_type_value();
     if( LT_CABLE_56K == ext_cable_type ) {
@@ -1848,23 +1876,16 @@ static int __init determine_initial_batt_status(void)
 	return 0;
 }
 
-#ifdef CONFIG_LGE_PM_CURRENT_CABLE_TYPE
-/* START. kiwone.seo@lge.com, 2011-08-11, to meet VZW spec , in case of booting up with TA+no battery */
-int get_is_battery_present(void)
-{
-	return msm_chg.batt_status;
-};
-EXPORT_SYMBOL(get_is_battery_present);
-/* END */
-#endif
-
 #ifdef CONFIG_LGE_AT_COMMAND_ABOUT_POWER
 extern int pm8058_start_charging_for_ATCMD(void);
 extern int pm8058_stop_charging_for_ATCMD(void);
 
 extern void max17040_set_battery_atcmd(int flag, int value);
 extern int max17040_get_battery_capacity_percent(void);
-extern void machine_restart(char *cmd);
+extern void (*arm_pm_restart)(char str, const char *cmd);
+
+extern int pm8058_start_charging_for_TESTMODE(void);
+extern int pm8058_stop_charging_for_TESTMODE(void);
 
 
 static ssize_t at_chg_status_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -1996,11 +2017,11 @@ static ssize_t at_fuel_guage_reset_show(struct device *dev, struct device_attrib
 {
 	int r = 0;
 
-	max17040_set_battery_atcmd(0, 100);  // Reset the fuel guage IC
+  max17040_set_battery_atcmd(0, 100);  // Reset the fuel guage IC
 
-	r = sprintf(buf, "%d\n", true);
+  r = sprintf(buf, "%d\n", true);
 
-	max17040_set_battery_atcmd(2, 100);  // Release the AT command mode
+  max17040_set_battery_atcmd(2, 100);  // Release the AT command mode
 	
 	return r;
 }
@@ -2011,9 +2032,9 @@ static ssize_t at_fuel_guage_level_show(struct device *dev, struct device_attrib
 	int r = 0;
 	int guage_level = 0;
 
-	guage_level = max17040_get_battery_capacity_percent();
+  guage_level = max17040_get_battery_capacity_percent();
 
-	r = sprintf(buf, "%d\n", guage_level);
+  r = sprintf(buf, "%d\n", guage_level);
 	
 	return r;
 }
@@ -2022,11 +2043,9 @@ static ssize_t at_pmic_reset_show(struct device *dev, struct device_attribute *a
 {
 	int r = 0;
 
-	msleep(500); //for waiting return values of testmode
+  arm_pm_restart(0, "reboot");
 
-	machine_restart(NULL);
-
-	r = sprintf(buf, "%d\n", true);
+  r = sprintf(buf, "%d\n", true);
 	
 	return r;
 }
@@ -2055,6 +2074,43 @@ DEVICE_ATTR(at_fuelval, 0644, at_fuel_guage_level_show, NULL);
 DEVICE_ATTR(at_pmrst, 0644, at_pmic_reset_show, NULL);
 DEVICE_ATTR(at_batl, 0644, at_batt_level_show, NULL);
 #endif
+
+
+void testmode_charging_mode_test(void)
+{
+  int ret;
+
+  /* Start Charging */
+  if(msm_chg.current_chg_priv->hw_chg_state != CHG_CHARGING_STATE)
+  {
+  	printk(KERN_DEBUG "############ [chg_status_store] START CHARGING #####################\n");
+
+	b_is_testmode_cmd_on = true;
+	msm_chg.current_chg_priv->hw_chg_state = CHG_CHARGING_STATE;
+	msm_chg.batt_status = BATT_STATUS_FAST_CHARGING;
+	ret = pm8058_start_charging_for_TESTMODE();
+
+	msm_charger_notify_event(usb_hw_chg_priv->hw_chg, CHG_BATT_BEGIN_FAST_CHARGING);
+  }
+	
+}
+EXPORT_SYMBOL(testmode_charging_mode_test);
+
+void testmode_discharging_mode_test(void)
+{
+  int ret;
+
+ /* Stop Charging */
+    if(msm_chg.current_chg_priv->hw_chg_state == CHG_CHARGING_STATE)
+    {
+      ret = pm8058_stop_charging_for_TESTMODE();
+      msm_chg.current_chg_priv->hw_chg_state = CHG_ABSENT_STATE;
+      msm_chg.batt_status = BATT_STATUS_ABSENT;
+      b_is_testmode_cmd_on = false;
+    }
+	
+}
+EXPORT_SYMBOL(testmode_discharging_mode_test);
 
 
 /* [LGE_UPDATE_S kyungho.kong@lge.com] */
@@ -2111,7 +2167,6 @@ static void msm_charger_temperature_battery_alarm(struct alarm *alarm)
 }
 #endif
 /* [LGE_UPDATE_E kyungho.kong@lge.com] */
-
 static int __devinit msm_charger_probe(struct platform_device *pdev)
 {
 #ifdef CONFIG_LGE_AT_COMMAND_ABOUT_POWER

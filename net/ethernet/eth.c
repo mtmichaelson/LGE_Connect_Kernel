@@ -339,12 +339,7 @@ void ether_setup(struct net_device *dev)
 	dev->header_ops		= &eth_header_ops;
 	dev->type		= ARPHRD_ETHER;
 	dev->hard_header_len 	= ETH_HLEN;
-/* 2010.2.24 jaeho.cho for VZW */
-#if 1
-	dev->mtu		= 1428;
-#else
 	dev->mtu		= ETH_DATA_LEN;
-#endif
 	dev->addr_len		= ETH_ALEN;
 	dev->tx_queue_len	= 1000;	/* Ethernet wants good queues */
 	dev->flags		= IFF_BROADCAST|IFF_MULTICAST;

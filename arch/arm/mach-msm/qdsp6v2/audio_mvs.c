@@ -29,6 +29,11 @@
 #include <linux/msm_audio_mvs.h>
 #include <mach/qdsp6v2/q6voice.h>
 
+
+//EW0804 Qualcomm VOLTE patch
+#define Qualcomm_patch
+
+
 /* Each buffer is 20 ms, queue holds 200 ms of data. */
 #define MVS_MAX_Q_LEN 10
 
@@ -53,12 +58,15 @@ struct audio_mvs_info_type {
 	uint32_t rate_type;
 	uint32_t dtx_mode;
 
+	struct q_min_max_rate min_max_rate;
+
 	struct list_head in_queue;
 	struct list_head free_in_queue;
 
 	struct list_head out_queue;
 	struct list_head free_out_queue;
 
+	wait_queue_head_t in_wait;
 	wait_queue_head_t out_wait;
 
 	struct mutex lock;
@@ -270,6 +278,24 @@ static void audio_mvs_process_ul_pkt(uint8_t *voc_pkt,
 			}
 			break;
 		}
+		case MVS_MODE_4GV_NB:
+		case MVS_MODE_4GV_WB: {
+			/* Remove the DSP frame info header.
+			 * Header format:
+			 * Bits 0-3: frame rate
+			 */
+			buf_node->frame.frame_type = 0;
+			voc_pkt = voc_pkt + DSP_FRAME_HDR_LEN;
+			buf_node->frame.len = pkt_len - DSP_FRAME_HDR_LEN;
+
+			memcpy(&buf_node->frame.voc_pkt[0],
+				voc_pkt,
+			buf_node->frame.len);
+
+			list_add_tail(&buf_node->list,
+					&audio->out_queue);
+			break;
+		}
 
 		default: {
 			buf_node->frame.frame_type = 0;
@@ -462,6 +488,27 @@ static void audio_mvs_process_dl_pkt(uint8_t *voc_pkt,
 			break;
 		}
 
+		case MVS_MODE_4GV_NB:
+		case MVS_MODE_4GV_WB: {
+			/* Add the DSP frame info header.
+			 * Header format:
+			 * Bits 0-3 : Frame rate
+			*/
+			*voc_pkt = rate_type & 0x0F;
+			voc_pkt = voc_pkt + DSP_FRAME_HDR_LEN;
+
+			*pkt_len = buf_node->frame.len + DSP_FRAME_HDR_LEN;
+
+			memcpy(voc_pkt,
+				&buf_node->frame.voc_pkt[0],
+				buf_node->frame.len);
+
+			list_add_tail(&buf_node->list, &audio->free_in_queue);
+			break;
+		}
+
+
+
 		default: {
 			*pkt_len = buf_node->frame.len;
 
@@ -479,6 +526,7 @@ static void audio_mvs_process_dl_pkt(uint8_t *voc_pkt,
 	}
 
 	spin_unlock_irqrestore(&audio->dsp_lock, dsp_flags);
+	wake_up(&audio->in_wait);
 }
 
 static uint32_t audio_mvs_get_media_type(uint32_t mvs_mode, uint32_t rate_type)
@@ -488,6 +536,14 @@ static uint32_t audio_mvs_get_media_type(uint32_t mvs_mode, uint32_t rate_type)
 	switch (mvs_mode) {
 	case MVS_MODE_IS127:
 		media_type = VSS_MEDIA_ID_EVRC_MODEM;
+		break;
+
+	case MVS_MODE_4GV_NB:
+		media_type = VSS_MEDIA_ID_4GV_NB_MODEM;
+		break;
+
+	case MVS_MODE_4GV_WB:
+		media_type = VSS_MEDIA_ID_4GV_WB_MODEM;
 		break;
 
 	case MVS_MODE_AMR:
@@ -526,28 +582,33 @@ static uint32_t audio_mvs_get_media_type(uint32_t mvs_mode, uint32_t rate_type)
 	return media_type;
 }
 
-//~~ [START] 2011.06.09 hj74.kim mvs loop back qualqumm patch
 static uint32_t audio_mvs_get_network_type(uint32_t mvs_mode)
 {
 	uint32_t network_type;
 
 	switch (mvs_mode) {
 	case MVS_MODE_IS127:
-		network_type = VSS_NETWORK_ID_CDMA_NB;
-		break;
-
+	case MVS_MODE_4GV_NB:
+	case MVS_MODE_AMR:
 	case MVS_MODE_LINEAR_PCM:
 	case MVS_MODE_PCM:
-		network_type = VSS_NETWORK_ID_GSM_NB;
-		break;
- 
-	case MVS_MODE_AMR:
-	case MVS_MODE_AMR_WB:
-		network_type = VSS_NETWORK_ID_GSM_NB;
-		break;
- 
 	case MVS_MODE_G729A:
 	case MVS_MODE_G711A:
+#ifndef Qualcomm_patch
+		network_type = VSS_NETWORK_ID_VOIP_NB;
+#else
+		network_type = VSS_NETWORK_ID_CDMA_NB;
+#endif
+		break;
+
+	case MVS_MODE_4GV_WB:
+	case MVS_MODE_AMR_WB:
+#ifndef Qualcomm_patch
+		network_type = VSS_NETWORK_ID_VOIP_WB;
+#else
+		network_type = VSS_NETWORK_ID_CDMA_WB;
+#endif
+		break;
 
 	default:
 		network_type = VSS_NETWORK_ID_DEFAULT;
@@ -557,7 +618,6 @@ static uint32_t audio_mvs_get_network_type(uint32_t mvs_mode)
 
 	return network_type;
 }
-//~~ [END] hj74.kim mvs loop back qualqumm patch
 
 static int audio_mvs_start(struct audio_mvs_info_type *audio)
 {
@@ -580,9 +640,12 @@ static int audio_mvs_start(struct audio_mvs_info_type *audio)
 		    audio_mvs_get_media_type(audio->mvs_mode, audio->rate_type),
 		    audio_mvs_get_rate(audio->mvs_mode, audio->rate_type),
 		    audio_mvs_get_network_type(audio->mvs_mode),
-		    audio->dtx_mode);
+		    audio->dtx_mode,
+		    audio->min_max_rate);
 
 		audio->state = AUDIO_MVS_STARTED;
+
+		pr_info("%s, mode=%d, rate=%d\n", __func__, audio->mvs_mode, audio->rate_type);
 	} else {
 		pr_err("%s: Error %d setting voc path to full\n", __func__, rc);
 	}
@@ -663,6 +726,7 @@ static int audio_mvs_release(struct inode *inode, struct file *file)
 	struct list_head *next = NULL;
 	struct audio_mvs_buf_node *buf_node = NULL;
 	struct audio_mvs_info_type *audio = file->private_data;
+	unsigned long dsp_flags;
 
 	pr_info("%s\n", __func__);
 
@@ -672,7 +736,8 @@ static int audio_mvs_release(struct inode *inode, struct file *file)
 		audio_mvs_stop(audio);
 
 	/* Free input and output memory. */
-	mutex_lock(&audio->in_lock);
+	spin_lock_irqsave(&audio->dsp_lock, dsp_flags);
+	//mutex_lock(&audio->in_lock);
 
 	list_for_each_safe(ptr, next, &audio->in_queue) {
 		buf_node = list_entry(ptr, struct audio_mvs_buf_node, list);
@@ -684,10 +749,9 @@ static int audio_mvs_release(struct inode *inode, struct file *file)
 		list_del(&buf_node->list);
 	}
 
-	mutex_unlock(&audio->in_lock);
+	//mutex_unlock(&audio->in_lock);
 
-
-	mutex_lock(&audio->out_lock);
+	//mutex_lock(&audio->out_lock);
 
 	list_for_each_safe(ptr, next, &audio->out_queue) {
 		buf_node = list_entry(ptr, struct audio_mvs_buf_node, list);
@@ -699,7 +763,8 @@ static int audio_mvs_release(struct inode *inode, struct file *file)
 		list_del(&buf_node->list);
 	}
 
-	mutex_unlock(&audio->out_lock);
+	//mutex_unlock(&audio->out_lock);
+	spin_unlock_irqrestore(&audio->dsp_lock, dsp_flags);
 
 	kfree(audio->memory_chunk);
 	audio->memory_chunk = NULL;
@@ -719,6 +784,7 @@ static ssize_t audio_mvs_read(struct file *file,
 	int rc = 0;
 	struct audio_mvs_buf_node *buf_node = NULL;
 	struct audio_mvs_info_type *audio = file->private_data;
+	unsigned long dsp_flags;
 
 	pr_debug("%s:\n", __func__);
 
@@ -728,7 +794,8 @@ static ssize_t audio_mvs_read(struct file *file,
 					     1 * HZ);
 
 	if (rc > 0) {
-		mutex_lock(&audio->out_lock);
+		//mutex_lock(&audio->out_lock);
+		spin_lock_irqsave(&audio->dsp_lock, dsp_flags);
 
 		if ((audio->state == AUDIO_MVS_STARTED) &&
 		    (!list_empty(&audio->out_queue))) {
@@ -770,7 +837,8 @@ static ssize_t audio_mvs_read(struct file *file,
 			rc = -EPERM;
 		}
 
-		mutex_unlock(&audio->out_lock);
+		//mutex_unlock(&audio->out_lock);
+		spin_unlock_irqrestore(&audio->dsp_lock, dsp_flags);
 
 	} else if (rc == 0) {
 		pr_err("%s: No UL data available\n", __func__);
@@ -855,6 +923,8 @@ static long audio_mvs_ioctl(struct file *file,
 		config.mvs_mode = audio->mvs_mode;
 		config.rate_type = audio->rate_type;
 		config.dtx_mode = audio->dtx_mode;
+		config.min_max_rate.min_rate = audio->min_max_rate.min_rate;
+		config.min_max_rate.max_rate = audio->min_max_rate.max_rate;
 
 		mutex_unlock(&audio->lock);
 
@@ -880,6 +950,11 @@ static long audio_mvs_ioctl(struct file *file,
 				audio->mvs_mode = config.mvs_mode;
 				audio->rate_type = config.rate_type;
 				audio->dtx_mode = config.dtx_mode;
+				audio->min_max_rate.min_rate =
+						config.min_max_rate.min_rate;
+				audio->min_max_rate.max_rate =
+						config.min_max_rate.max_rate;
+				
 			} else {
 				pr_err("%s: Set confg called in state %d\n",
 				       __func__, audio->state);
@@ -965,6 +1040,7 @@ static int __init audio_mvs_init(void)
 
 	memset(&audio_mvs_info, 0, sizeof(audio_mvs_info));
 
+	init_waitqueue_head(&audio_mvs_info.in_wait);
 	init_waitqueue_head(&audio_mvs_info.out_wait);
 
 	mutex_init(&audio_mvs_info.lock);

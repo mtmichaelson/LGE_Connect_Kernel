@@ -250,6 +250,11 @@ void mipi_dsi_post_kickoff_del(struct dsi_kickoff_action *act);
 void mipi_dsi_controller_cfg(int enable);
 void mipi_dsi_sw_reset(void);
 
+#if defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
+void mipi_dsi_cmd_bta_lgd_only(void);
+void mipi_dsi_set_display_on(struct msm_fb_data_type *mfd);
+#endif
+
 irqreturn_t mipi_dsi_isr(int irq, void *ptr);
 
 #endif /* MIPI_DSI_H */

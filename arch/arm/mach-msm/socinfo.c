@@ -205,7 +205,7 @@ static struct socinfo_v1 dummy_socinfo = {
 	.build_id = "Dummy socinfo placeholder"
 };
 
-#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
+#if 1//def CONFIG_LGE_PM_BATTERY_ID_CHECKER
 u16 *batt_id = 0;
 uint16_t battery_info_get(void)
 {
@@ -215,7 +215,9 @@ uint16_t battery_info_get(void)
     return *batt_id;
 }
 EXPORT_SYMBOL(battery_info_get);
+#endif
 
+#ifdef CONFIG_LGE_PM
 u16 *poweron_st = 0;
 uint16_t power_on_status_info_get(void)
 {
@@ -283,17 +285,9 @@ static uint32_t socinfo_get_accessory_chip(void)
 
 uint32_t socinfo_get_platform_subtype(void)
 {
-//[START][USB] seunghun.kim : temp add for SFN using QCOM two modem
-#ifdef CONFIG_LGE_USB_TEMP_SUPPORT_QCOM_TWO_MODEM
-	return 3;
-#else
-//[END][USB] seunghun.kim : temp add for SFN using QCOM two modem
 	return socinfo ?
 		(socinfo->v1.format >= 6 ? socinfo->v6.hw_platform_subtype : 0)
 		: 0;
-//[START][USB] seunghun.kim : temp add for SFN using QCOM two modem
-#endif
-//[END][USB] seunghun.kim : temp add for SFN using QCOM two modem
 }
 
 enum msm_cpu socinfo_get_msm_cpu(void)

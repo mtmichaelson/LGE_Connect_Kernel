@@ -96,13 +96,6 @@ config USB_GADGET_VBUS_DRAW
 	   This value will be used except for system-specific gadget
 	   drivers that have more specific information.
 
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-09-09, LG_FW_CHARGING
-config LGE_CHARGING
-	bool "Support LGE Battery Charging"
-	default n
-	help
-	  LGE Battery Charging enable
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-09-09, LG_FW_CHARGING
 config	USB_GADGET_SELECTED
 	boolean
 
@@ -1194,43 +1187,6 @@ config RMNET_SMD_DATA_CHANNEL
 
 endchoice
 
-# BEGIN:0011202 [yk.kim@lge.com] 2010-11-21 #
-# ADD:0011202 LG USB Kconfig from VS660 #
-# LGE_CHANGE_S [hyunhui.park@lge.com] 2010-04-27, Refine LG USB Kconfig
-# LGE_CHANGE_S [younsuk.song@lge.com] 2010-06-28 Add LG USB Kconfig for Gadget framework
-config USB_SUPPORT_LGE_FACTORY_USB
-	boolean "USB Support LGE Factory USB(CDMA class)"
-	depends on USB_SUPPORT_LGE_GADGET_CDMA
-	select LGE_SUPPORT_RAPI
-	help
-	  Supports LG USB driver for factory manufacturing(CDMA class)
-	
-	default n
-
-config USB_SUPPORT_LGE_SERIAL_FROM_ARM9_MEID
-	boolean "Serial Number from ARM9's MEID(CDMA class)"
-	depends on USB_SUPPORT_LGE_GADGET_CDMA
-	select LGE_SUPPORT_RAPI
-	help
-	  Get usb device's serial number from arm's MEID(CDMA class)
-
-	default n
-
-# LGE_CHANGE_E [younsuk.song@lge.com] 2010-06-28 
-# LGE_CHANGE_E [hyunhui.park@lge.com] 2010-04-27
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-07-16, LG_FW_MTP_DRIVER
-config LGE_USB_GADGET_MTP_DRIVER
-	tristate "USB Gadget LG MTP Driver"
-	depends on USB_GADGET
-	help
-	  Supports LG MTP driver
-	
-	default n
-
-# LGE_CHANGE_E [jaeho.cho@lge.com] 2010-07-16
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-04-21, LG_FW_ANDROID_USB_GADGET
 config LGE_USB_GADGET_DRIVER
 	tristate "LG USB Gadget Driver"
 	depends on USB_GADGET
@@ -1238,148 +1194,6 @@ config LGE_USB_GADGET_DRIVER
 	  LG USB gadget driver
 	
 	default n
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-04-21, LG_FW_ANDROID_USB_GADGET
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-06-22, LG_FW_ANDROID_USB_GADGET
-config LGE_USB_GADGET_SUPPORT_FACTORY_USB
-	tristate "USB Gadget Support LGE Factory USB"
-	depends on USB_GADGET
-	help
-	  Supports LG USB driver
-	
-	default n
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-06-22, LG_FW_ANDROID_USB_GADGET
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-12-26, LG_FW_ANDROID_USB_GADGET
-config LGE_USB_GADGET_FUNC_BIND_ONLY_INIT
-	boolean "Function is binded only in init section"
-	depends on USB_GADGET
-	help
-	  Function is binded only in init section
-	
-	default n
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-12-26, LG_FW_ANDROID_USB_GADGET
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-12-30, LG_FW_ANDROID_USB_GADGET
-config LGE_USB_GADGET_NDIS_DRIVER
-	boolean "LG SI United ndis driver"
-	depends on USB_GADGET
-	help
-	  Support LG SI United ndis driver
-	
-	default n
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-12-30, LG_FW_ANDROID_USB_GADGET
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-1-14, LG_FW_ANDROID_USB_GADGET
-config LGE_USB_GADGET_NDIS_UNITED_DRIVER
-	boolean "LG SI United ndis driver"
-	depends on USB_GADGET
-	help
-	  Support LG SI United ndis driver
-	
-	default n
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-1-14, LG_FW_ANDROID_USB_GADGET
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-1-14, LG_FW_ANDROID_USB_GADGET
-config LGE_USB_GADGET_NDIS_VZW_DRIVER
-	boolean "LG SI United ndis driver for VZW"
-	depends on USB_GADGET
-	help
-	  Support LG SI United ndis driver for VZW
-	
-	default n
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-1-14, LG_FW_ANDROID_USB_GADGET
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2011-3-11, LG_FW_ANDROID_USB_GADGET
-config LGE_USB_GADGET_NDIS_UNITED_DRIVER_NET_MODE
-	boolean "LG SI United ndis driver network mode"
-	depends on USB_GADGET
-	help
-	  Support LG SI United ndis driver network mode
-	
-	default n
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2011-3-11, LG_FW_ANDROID_USB_GADGET
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-09-07, LG_FW_ANDROID_UMS_WORKAROUND_PATCH
-config LGE_UMS_WORKAROUND_PATCH
-	tristate "LG UMS Workaround Patch"
-	depends on USB_GADGET
-	help
-	  LG UMS Workaround Patch
-	
-	default n
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2010-09-07, LG_FW_ANDROID_USB_GADGET
-
-# LGE_CHANGE_S [hyunhui.park@lge.com] 2010-08-11, Autorun Support
-config USB_SUPPORT_LGE_ANDROID_AUTORUN
-	boolean "Autorun support in LGE Android model(common)"
-	depends on USB_GADGET
-	help
-	  It supports Autorun feature in LGE Android model if it is needed.
-
-	default n
-# LGE_CHANGE_E [hyunhui.park@lge.com] 2010-08-11 	
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2011-01-23, Autorun  Charge only Support
-config USB_SUPPORT_LGE_ANDROID_AUTORUN_CGO
-	boolean "Autorun charge only support in LGE Android model(common)"
-	depends on USB_SUPPORT_LGE_ANDROID_AUTORUN
-	help
-	  It supports Autorun charge only feature in LGE Android model if it is needed.
-
-	default n
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2011-01-23, Autorun Charge only Support
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2011-01-23
-config LGE_USB_GADGET_PLATFORM_DRIVER
-	boolean "LG USB Gadget Platform Driver"
-	depends on USB_GADGET
-	help
-	  LG USB gadget platform driver
-	
-	default n
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2011-01-23
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2011-04-12
-config LGE_USB_GADGET_F_DIAG_RPC
-	boolean "Use f_diag RPC for dload PID and Serial number"
-	depends on USB_GADGET
-	help
-	  f_diag RPC for dload PID and Serial number
-	
-	default n
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2011-04-12
-
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2011-04-23
-config LGE_DIAGTEST
-        tristate "Support LGE diag test mode"
-        default n
-        depends on MACH_LGE
-        select LGE_SUPPORT_RAPI
-        help
-          LGE diag test mode
-# LGE_CHANGE_S [jaeho.cho@lge.com] 2011-04-23
-
-# LGE_CHANGE_S [hyunhui.park@lge.com] 2010-08-11, GPS fix for LG Driver 
-config USB_SUPPORT_LGE_ANDROID_NMEA_FIX
-	boolean "NMEA interface support in LGE Android model(common)"
-	depends on USB_GADGET
-	select MODEM_SUPPORT
-	help
-	  It supports LG NMEA interface in LGE Android model.
-
-	default n
-# LGE_CHANGE_E [hyunhui.park@lge.com] 2010-08-11 	
-
-# LGE_CHANGE_S [hyunhui.park@lge.com] 2010-08-31, CDC ECM fix for LG Driver 
-config USB_SUPPORT_LGE_ANDROID_ECM_FIX
-	boolean "CDC ECM interface support in LGE Android model(common)"
-	depends on USB_GADGET
-	help
-	  It supports LG CDC ECM interface in LGE Android model.
-
-	default n
-# LGE_CHANGE_E [hyunhui.park@lge.com] 2010-08-31 
 
 config LGE_USB_AUTORUN
 	boolean "Autorun support in LGE Android model(common)"

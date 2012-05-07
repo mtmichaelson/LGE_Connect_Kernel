@@ -17,12 +17,6 @@
 #include <linux/gfp.h>
 
 #ifdef CONFIG_SMP
-
-#if defined (CONFIG_LG_SYSPROF) && defined (CONFIG_LG_SYSPROF_KEVENT)
-extern int task_trace_flag;
-void sysprof_kevent_log(char *, char *, char *);
-#endif
-
 /* Serializes the updates to cpu_online_mask, cpu_present_mask */
 static DEFINE_MUTEX(cpu_add_remove_lock);
 
@@ -270,15 +264,6 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen)
 	/* This actually kills the CPU. */
 	__cpu_die(cpu);
 
-#if defined (CONFIG_LG_SYSPROF) && defined (CONFIG_LG_SYSPROF_KEVENT)
-	if (unlikely(task_trace_flag)) {
-		char buf[32] = {'\0', };
-		sprintf(buf, "CPU%d shutdown", cpu);
-//		printk("%s\n", buf);
-		sysprof_kevent_log("CPU", buf, (char*)__func__);
-	}
-#endif
-
 	/* CPU is completely dead: tell everyone.  Too late to complain. */
 	cpu_notify_nofail(CPU_DEAD | mod, hcpu);
 
@@ -335,15 +320,6 @@ static int __cpuinit _cpu_up(unsigned int cpu, int tasks_frozen)
 	if (ret != 0)
 		goto out_notify;
 	BUG_ON(!cpu_online(cpu));
-
-#if defined (CONFIG_LG_SYSPROF) && defined (CONFIG_LG_SYSPROF_KEVENT)
-	if (unlikely(task_trace_flag)) {
-		char buf[32] = {'\0', };
-		sprintf(buf, "CPU%u booted", cpu);
-//		printk("%s\n", buf);
-		sysprof_kevent_log("CPU", buf, (char*)__func__);
-	}
-#endif
 
 	set_cpu_active(cpu, true);
 

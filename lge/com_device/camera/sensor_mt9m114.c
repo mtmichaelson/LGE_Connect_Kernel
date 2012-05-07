@@ -29,8 +29,6 @@
 #include "register_common_init.h"
 #endif
 
-//jinho.jang - ief off while camera preview
-#define LGIT_IEF_SWITCH
 
 /* Micron MT9M114 Registers and their values */
 
@@ -77,28 +75,38 @@ static int mt9m114_probe_init_done(const struct msm_camera_sensor_info *data)
 {
 	CDBG("%s : mt9m114 sensor_reset 0\n", __func__);
 	gpio_direction_output(data->sensor_reset, 0);
+    gpio_direction_output(data->vt_mclk_enable, 0);
 	gpio_free(data->sensor_reset);
-
-	mt9m114_ctrl->sensordata->pdata->camera_power_off();	
-		
+    gpio_free(data->vt_mclk_enable);
 	return 0;
 }
 
 static int mt9m114_reset(const struct msm_camera_sensor_info *dev)
 {
 	int rc = 0;
+    rc = gpio_request(dev->vt_mclk_enable, "mt9m114_clk_en");
+    if (!rc) {
+        rc = gpio_direction_output(dev->vt_mclk_enable, 1);
+        CDBG("%s: vt_mclk_enable 0 = %d, rc = %d\n",__func__, dev->vt_mclk_enable, rc);
+    }
+    else{
+        gpio_free(dev->vt_mclk_enable);
+        return -EFAULT;
+    }
+    mdelay(5);
 
-	rc = gpio_request(dev->sensor_reset, "mt9m114");
+	rc = gpio_request(dev->sensor_reset, "mt9m114_reset");
     
 	if (!rc) {
 		rc = gpio_direction_output(dev->sensor_reset, 0);
-		CDBG("%s: reset 0 = %d, rc = %d/n",__func__, dev->sensor_reset, rc);
+		CDBG("%s: reset 0 = %d, rc = %d\n",__func__, dev->sensor_reset, rc);
 		mdelay(10);
 		rc = gpio_direction_output(dev->sensor_reset, 1);
-		CDBG("%s: reset 1 = %d, rc = %d/n",__func__, dev->sensor_reset, rc);
+		CDBG("%s: reset 1 = %d, rc = %d\n",__func__, dev->sensor_reset, rc);
 	}
 	else{
 		CDBG(" mt9m114_probe_init_sensor fails\n");
+		mt9m114_probe_init_done(dev);
 
 		return -EFAULT;
 	}
@@ -331,12 +339,8 @@ static int32_t mt9m114_i2c_write_table(struct mt9m114_i2c_reg_conf const *reg_co
 			printk(KERN_ERR "### %s : Patch check, 0x0080 Reg : 0x%x\n", __func__, test_data);
 		}		
 		else
-		{
 			rc = mt9m114_i2c_write_w_sensor(reg_conf_tbl->waddr, reg_conf_tbl->wdata);
-			if (rc < 0)
-			    return rc;
 //			rc = mt9m114_i2c_write(mt9m114_client->addr, reg_conf_tbl->waddr, reg_conf_tbl->wdata, reg_conf_tbl->width);
-		}
 
 		if (rc < 0)
 			break;
@@ -593,10 +597,10 @@ static int mt9m114_set_antibanding(int mode)
 	return rc;	
 }
 
-static int brightness_table[] = {0x0020, 0x0024, 0x0028, 0x002E, 0x0032, 0x0035, 0x003E, 0x0048, 0x0050, 0x0054, 0x0058, 0x005C, 0x005F}; // 13 step
+static int brightness_table[] = {0xDC00, 0xE200, 0xE800, 0xEE00, 0xF400, 0xFA00, 0x0000, 0x0800, 0x1000, 0x1800, 0x2800, 0x3000, 0x3800}; // 13 step
 																		// value < 0x80 --> value should be increased , max value => 0x7F00
 							// value > 0x80 --> value should be decreased	, max value => 0x8100													
-static int gamma_table_sub[] = {0x00C4, 0x00C8, 0x00CC, 0x00D0, 0x00D4, 0x00D8, 0x00DC, 0x00DF, 0x00E3, 0x00E8, 0x00ED, 0x00F2, 0x00F7}; // 13 step							
+static int gamma_table_sub[] = {0x00DC, 0x00DC, 0x00DC, 0x00DC, 0x00DC, 0x00DC, 0x00DC, 0x00DC, 0x00DC, 0x00DC, 0x00C8, 0x00C8, 0x00C8}; // 13 step							
 							// 2.2 gamma 															// 0.5 gamma
 static int mt9m114_set_brightness(int mode)
 {
@@ -614,16 +618,18 @@ static int mt9m114_set_brightness(int mode)
 		CDBG("###[ERROR]%s: Invalid Mode value\n", __func__);
 		return -EINVAL;	
 	}
-       // LOGICAL_ADDRESS_ACCESS [CAM_LL_GAMMA]
-	rc = mt9m114_i2c_write_w_sensor(0x098E, 0x4940);
+	rc = mt9m114_i2c_write_w_sensor(0x098E, 0xC870);
 	if (rc < 0)
 		return rc;	
-	// CAM_LL_GAMMA
+	rc = mt9m114_i2c_write_w_sensor(0x0990, brightness_table[mode]);
+	if (rc < 0)
+		return rc;
 	rc = mt9m114_i2c_write_w_sensor(0xC940, gamma_table_sub[mode]);
 	if (rc < 0)
 		return rc;
-       // UVC_BRIGHTNESS_CONTROL
-	rc = mt9m114_i2c_write_w_sensor(0xCC0A, brightness_table[mode]);
+
+
+ 	rc = mt9m114_i2c_write_table(mt9m114_regs.change_config_tbl, mt9m114_regs.change_config_tbl_size);
 	if (rc < 0)
 		return rc;	
 
@@ -765,16 +771,7 @@ static int mt9m114_set_Fps(int mode)
 			rc = mt9m114_i2c_write_w_sensor(0x098E, 0x4812);
 			if (rc < 0)
 				return rc;	
-			rc = mt9m114_i2c_write_w_sensor(0xC810, 0x05B3);
-			if (rc < 0)
-				return rc;					
 			rc = mt9m114_i2c_write_w_sensor(0xC812, 0x07E0);
-			if (rc < 0)
-				return rc;		
-			rc = mt9m114_i2c_write_w_sensor(0xC814, 0x0636);
-			if (rc < 0)
-				return rc;				
-			rc = mt9m114_i2c_write_w_sensor(0xC88C, 0x1E02);
 			if (rc < 0)
 				return rc;			
 			rc = mt9m114_i2c_write_w_sensor(0xC88E, 0x1E02);
@@ -787,16 +784,7 @@ static int mt9m114_set_Fps(int mode)
 			rc = mt9m114_i2c_write_w_sensor(0x098E, 0x4812);
 			if (rc < 0)
 				return rc;	
-			rc = mt9m114_i2c_write_w_sensor(0xC810, 0x05B3);
-			if (rc < 0)
-				return rc;					
 			rc = mt9m114_i2c_write_w_sensor(0xC812, 0x03EE);
-			if (rc < 0)
-				return rc;			
-			rc = mt9m114_i2c_write_w_sensor(0xC814, 0x0636);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC88C, 0x1E02);
 			if (rc < 0)
 				return rc;			
 			rc = mt9m114_i2c_write_w_sensor(0xC88E, 0x1E02);
@@ -810,16 +798,7 @@ static int mt9m114_set_Fps(int mode)
 			rc = mt9m114_i2c_write_w_sensor(0x098E, 0x4812);
 			if (rc < 0)
 				return rc;	
-			rc = mt9m114_i2c_write_w_sensor(0xC810, 0x05B3);
-			if (rc < 0)
-				return rc;					
 			rc = mt9m114_i2c_write_w_sensor(0xC812, 0x03EE);
-			if (rc < 0)
-				return rc;			
-			rc = mt9m114_i2c_write_w_sensor(0xC814, 0x0636);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC88C, 0x1E02);
 			if (rc < 0)
 				return rc;			
 			rc = mt9m114_i2c_write_w_sensor(0xC88E, 0x0A00);
@@ -833,95 +812,27 @@ static int mt9m114_set_Fps(int mode)
 			rc = mt9m114_i2c_write_w_sensor(0x098E, 0x4812);
 			if (rc < 0)
 				return rc;	
-			rc = mt9m114_i2c_write_w_sensor(0xC810, 0x05B3);
-			if (rc < 0)
-				return rc;					
 			rc = mt9m114_i2c_write_w_sensor(0xC812, 0x03EE);
 			if (rc < 0)
-				return rc;		
-			rc = mt9m114_i2c_write_w_sensor(0xC814, 0x0636);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC88C, 0x1E02);
-			if (rc < 0)
-				return rc;					
+				return rc;			
 			rc = mt9m114_i2c_write_w_sensor(0xC88E, 0x0780);
 			if (rc < 0)
 				return rc;		
 			break;
-
-//Start LGE_BSP_CAMERA : mutul - jonghwan.ko@lge.com
-		case SENSOR_FIXED_FPS_10:
-			// 10fps fixed
-			rc = mt9m114_i2c_write_w_sensor(0x098E, 0x4812);
-			if (rc < 0)
-				return rc;	
-			rc = mt9m114_i2c_write_w_sensor(0xC810, 0x05BD);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC812, 0x0BB8);
-			if (rc < 0)
-				return rc;		
-			rc = mt9m114_i2c_write_w_sensor(0xC814, 0x0640);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC88C, 0x0A00);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC88E, 0x0A00);
-			if (rc < 0)
-				return rc;					
-			break;
-
-		case SENSOR_FIXED_FPS_08:
-			// 8fps fixed
-			rc = mt9m114_i2c_write_w_sensor(0x098E, 0x4812);
-			if (rc < 0)
-				return rc;	
-			rc = mt9m114_i2c_write_w_sensor(0xC810, 0x05BD);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC812, 0x0EA6);
-			if (rc < 0)
-				return rc;		
-			rc = mt9m114_i2c_write_w_sensor(0xC814, 0x0640);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC88C, 0x0800);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC88E, 0x0800);
-			if (rc < 0)
-				return rc;				
-			break;			
-
-		case SENSOR_FIXED_FPS_07:
-			// 8fps fixed
-			rc = mt9m114_i2c_write_w_sensor(0x098E, 0x4812);
-			if (rc < 0)
-				return rc;	
-			rc = mt9m114_i2c_write_w_sensor(0xC810, 0x15EC);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC812, 0x04AA);
-			if (rc < 0)
-				return rc;		
-			rc = mt9m114_i2c_write_w_sensor(0xC814, 0x166F);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC88C, 0x0700);
-			if (rc < 0)
-				return rc;					
-			rc = mt9m114_i2c_write_w_sensor(0xC88E, 0x0700);
-			if (rc < 0)
-				return rc;				
-			break;						
-//End  LGE_BSP_CAMERA : mutul - jonghwan.ko@lge.com
 			
 		default:
+			// 30 fps fixed
+			rc = mt9m114_i2c_write_w_sensor(0x098E, 0x4812);
+			if (rc < 0)
+				return rc;	
+			rc = mt9m114_i2c_write_w_sensor(0xC812, 0x03EE);
+			if (rc < 0)
+				return rc;			
+			rc = mt9m114_i2c_write_w_sensor(0xC88E, 0x1E02);
+			if (rc < 0)
+				return rc;		
 		       printk(KERN_ERR "mt9m114_set_Fps wrong value : %d \n ",mode);
-		       rc =0;
-		       return rc;
+			break;
 	}
 	
  	rc = mt9m114_i2c_write_table(mt9m114_regs.change_config_tbl, mt9m114_regs.change_config_tbl_size);
@@ -930,19 +841,6 @@ static int mt9m114_set_Fps(int mode)
 
 	prev_fps_mode = mode;
 	printk(KERN_ERR "mt9m114_set_Fps Change Frame rate \n ");
-
-	if(prev_brightness_mode != 6) // Set again when mode is not center 
-	{
-		printk(KERN_ERR "### Set again when mode is not center, value is %d\n ",prev_brightness_mode);
-		rc = mt9m114_i2c_write_w_sensor(0x337E, brightness_table[prev_brightness_mode]);
-		if (rc < 0)
-			return rc;	
-
-		rc = mt9m114_i2c_write_w_sensor(0xC940, gamma_table_sub[prev_brightness_mode]);
-		if (rc < 0)
-			return rc;
-	}
-	
 	return rc;
 }
 // LGE_CAMERA_E : Adjust VT Cam frame rate - jonghwan.ko@lge.com
@@ -1141,18 +1039,11 @@ int mt9m114_sensor_config(void __user *argp)
 	return rc;
 }
 
-#ifdef LGIT_IEF_SWITCH
-extern int mipi_lgit_lcd_ief_off(void);
-extern int mipi_lgit_lcd_ief_on(void);
-#endif
-
 static int mt9m114_sensor_init_probe(const struct msm_camera_sensor_info *data)
 {
 	int rc = 0;
 
 	CDBG("%s in :%d\n",__func__, __LINE__);
-
-	data->pdata->camera_power_on();
 
 	rc = mt9m114_reset(data);
 	if (rc < 0) {
@@ -1186,10 +1077,6 @@ static int mt9m114_sensor_init_probe(const struct msm_camera_sensor_info *data)
 	rc = mt9m114_reg_init();
 	if (rc < 0)
 		goto init_probe_fail;
-
-#ifdef LGIT_IEF_SWITCH
-	mipi_lgit_lcd_ief_off();
-#endif
 
 	CDBG("mt9m114_sensor_init_probe done\n");
 	return rc;
@@ -1243,6 +1130,7 @@ init_done:
 	return rc;
 
 init_fail:
+	mt9m114_probe_init_done(data);	
 	kfree(mt9m114_ctrl);
 	return rc;
 }
@@ -1258,16 +1146,13 @@ int mt9m114_sensor_release(void)
 {
 	int rc = 0;
 
-#ifdef LGIT_IEF_SWITCH
-	mipi_lgit_lcd_ief_on(); 
-#endif
-
 	mutex_lock(&mt9m114_sem);
-
-	mt9m114_ctrl->sensordata->pdata->camera_power_off();	
 	
 	//gpio_direction_output(mt9m114_ctrl->sensordata->sensor_reset, 0);
+	gpio_direction_output(mt9m114_ctrl->sensordata->vt_mclk_enable, 0);
+	printk(KERN_ERR "%s = %d\n",__func__, mt9m114_ctrl->sensordata->vt_mclk_enable);
 	gpio_free(mt9m114_ctrl->sensordata->sensor_reset);
+    gpio_free(mt9m114_ctrl->sensordata->vt_mclk_enable);
 
 	kfree(mt9m114_ctrl);
 

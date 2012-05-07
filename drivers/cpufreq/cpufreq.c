@@ -1538,10 +1538,6 @@ EXPORT_SYMBOL(cpufreq_unregister_notifier);
  *                              GOVERNORS                            *
  *********************************************************************/
 
-#if defined (CONFIG_LG_SYSPROF) && defined (CONFIG_LG_SYSPROF_KEVENT)
-extern int task_trace_flag;
-void sysprof_kevent_log(char *, char *, char *);
-#endif
 
 int __cpufreq_driver_target(struct cpufreq_policy *policy,
 			    unsigned int target_freq,
@@ -1551,18 +1547,8 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 
 	dprintk("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
 		target_freq, relation);
-	if (cpu_online(policy->cpu) && cpufreq_driver->target) {
+	if (cpu_online(policy->cpu) && cpufreq_driver->target)
 		retval = cpufreq_driver->target(policy, target_freq, relation);
-
-#if defined (CONFIG_LG_SYSPROF) && defined (CONFIG_LG_SYSPROF_KEVENT)
-//		printk("CPU%d freq scale debug %s %d\n", policy->cpu, __func__, target_freq);
-		if (unlikely(task_trace_flag)) {
-			char buf[32] = {'\0', };
-			sprintf(buf, "CPU%d %d", policy->cpu, target_freq);
-			sysprof_kevent_log("CPU", buf, (char*)__func__);
-		}
-#endif
-	}
 
 	return retval;
 }

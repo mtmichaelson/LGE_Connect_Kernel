@@ -2828,11 +2828,11 @@ dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
 
 #if defined(CONFIG_WIRELESS_EXT)
 #ifdef SOFTAP
-// hotspot_patch_1020	if (ifidx == 0)
-// hotspot_patch_1020		/* Don't call for SOFTAP Interface in SOFTAP MODE */
-// hotspot_patch_1020		wl_iw_iscan_set_scan_broadcast_prep(net, 1);
+	if (ifidx == 0)
+		/* Don't call for SOFTAP Interface in SOFTAP MODE */
+		wl_iw_iscan_set_scan_broadcast_prep(net, 1);
 #else
-// hotspot_patch_1020		wl_iw_iscan_set_scan_broadcast_prep(net, 1);
+		wl_iw_iscan_set_scan_broadcast_prep(net, 1);
 #endif /* SOFTAP */
 #endif /* CONFIG_WIRELESS_EXT */
 

@@ -208,16 +208,23 @@ enum
 //NAGSM_Android_SEL_Kernel_Aakash_20101206
 
 
-struct i2c_client* get_sii9244_client(u8 device_id);
-u8 sii9244_i2c_read(struct i2c_client *client, u8 reg);
-int sii9244_i2c_write(struct i2c_client *client, u8 reg, u8 data);
-extern void SiI9244_interrupt_event(void);
+struct i2c_client* get_sii9234_client(u8 device_id);
+u8 SII9234_i2c_read(struct i2c_client *client, u8 reg);
+int SII9234_i2c_write(struct i2c_client *client, u8 reg, u8 data);
+extern void SiI9234_interrupt_event(void);
 
-extern void mhl_pwroff_request(void);
-extern void sii9244_cfg_power(bool on);
+extern void sii9234_cfg_power(bool on);
 extern byte ReadByteTPI (byte Offset);
-extern void rcp_cbus_uevent(u8 rcpCode);
-extern int check_usb_online(void);
-int sii9244_get_last_rsen_incorrect(void);
-void sii9244_clear_rsen_incorrect(void);
+
+#define PMIC8058_IRQ_BASE				(NR_MSM_IRQS + NR_GPIO_IRQS)
+#define IRQ_MHL_HPD gpio_to_irq(172)
+
+#define PM8058_GPIO_BASE			NR_MSM_GPIOS
+#define PM8058_GPIO_PM_TO_SYS(pm_gpio)		(pm_gpio + PM8058_GPIO_BASE)
+
+#define IRQ_MHL_INT gpio_to_irq(30) //PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, (PM8058_GPIO(9)))
+#define IRQ_MHL_WAKE_UP 153 //PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, (PM8058_GPIO(17)))
+
+#define GPIO_MHL_RST 142 //PM8058_GPIO_PM_TO_SYS(PM8058_GPIO(15))
+#define GPIO_MHL_SEL 33 //PM8058_GPIO_PM_TO_SYS(PM8058_GPIO(16))
 #endif

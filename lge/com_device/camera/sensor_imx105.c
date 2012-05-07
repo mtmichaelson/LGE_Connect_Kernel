@@ -27,22 +27,15 @@
 #include <linux/debugfs.h>
 #include "sensor_imx105.h"
 
-//add msm_rotator_control_status
-#undef MSM_ROTATOR_IOCTL_CHECK
-
-// Start LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com
-#define SHUTTER_LAG_TEST
-// End LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com
+//jinho.jang - add msm_rotator_control_status
+#define MSM_ROTATOR_IOCTL_CHECK
 
 #ifdef MSM_ROTATOR_IOCTL_CHECK
 #include <mach/board_lge.h>
 #endif
 
 // LGE_CAMERA_S : Fast AF - jonghwan.ko@lge.com
-//#include "./../../../../vendor/qcom/proprietary/mm-camera/targets/tgtcommon/isp3a/af/af_lib_API.h"
-#ifdef USE_LG_fast_af
-#undef USE_LG_fast_af
-#endif
+#include "./../../../../vendor/qcom/proprietary/mm-camera/targets/tgtcommon/isp3a/af/af_lib_API.h"
 // LGE_CAMERA_E : Fast AF - jonghwan.ko@lge.com
 
 // Start LGE_BSP_CAMERA::shchang@qualcomm.com 2011-06-24
@@ -68,8 +61,8 @@
 
 // LGE_CAMERA_S : Fast AF - jonghwan.ko@lge.com
 #ifdef USE_LG_fast_af
-#define	IMX105_STEPS_NEAR_TO_CLOSEST_INF		32 //32 sungmin.woo
-#define	IMX105_TOTAL_STEPS_NEAR_TO_FAR			32 //32 sungmin.woo
+#define	IMX105_STEPS_NEAR_TO_CLOSEST_INF		50 //32 sungmin.woo
+#define	IMX105_TOTAL_STEPS_NEAR_TO_FAR			50 //32 sungmin.woo
 #else
 #define	IMX105_STEPS_NEAR_TO_CLOSEST_INF		32 //32 sungmin.woo
 #define	IMX105_TOTAL_STEPS_NEAR_TO_FAR			32 //32 sungmin.woo
@@ -103,7 +96,7 @@
 #define AF_MECH_INFINITY (0x03)
 // LGE_CAMERA_S : Fast AF - jonghwan.ko@lge.com
 #ifdef USE_LG_fast_af
-uint16_t AF_OPTICAL_INFINITY;	//sungmin.woo max. 135~576, ave.183~460
+#define AF_OPTICAL_INFINITY (135)	//sungmin.woo max. 135~576, ave.183~460
 #else
 #define AF_OPTICAL_INFINITY (190)	//sungmin.woo original = 190
 #endif
@@ -132,17 +125,6 @@ uint16_t imx105_l_region_code_per_step = 12;
 static int cam_debug_init(void);
 static struct dentry *debugfs_base;
 
-#define LGIT_IEF_SWITCH
-
-// Start LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com
-#ifdef SHUTTER_LAG_TEST
-static int snapshot_flag;
-#define SHUTTER_REGSET_FIRST	0
-#define SHUTTER_REGSET_SECOND	1
-#define SHUTTER_REGSET_STARTED	1
-#define SHUTTER_REGSET_NONE		0
-#endif
-// End LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com
 /*============================================================================
 							 TYPE DECLARATIONS
 ============================================================================*/
@@ -156,10 +138,11 @@ static int snapshot_flag;
 #define	IMX105_FULL_SIZE_WIDTH      3280
 #define	IMX105_FULL_SIZE_HEIGHT		2464
 #define	IMX105_HRZ_FULL_BLK_PIXELS	256
-#define	IMX105_VER_FULL_BLK_LINES	46	//70 LGE_BSP_CAMERA::shchang@qualcom.com_0707 for flicker
+#define	IMX105_VER_FULL_BLK_LINES	70
 #define	IMX105_FULL_SIZE_DUMMY_PIXELS	0
 #define	IMX105_FULL_SIZE_DUMMY_LINES	0
-
+#define	IMX105_HRZ_FULL_BLK_PIXELS	256		/* (Snapshot) Frame width  (0x0342 | 0x0343) - CutOut Setting Size X Direction */
+#define	IMX105_VER_FULL_BLK_LINES	70      /* (Snapshot) Frame height (0x0340 | 0x0341) - CutOut Setting Size Y Direction */
 /* Quarter Size	*/
 #define	IMX105_QTR_SIZE_WIDTH	1640
 #define	IMX105_QTR_SIZE_HEIGHT	1232
@@ -172,7 +155,7 @@ static int snapshot_flag;
 #define	IMX105_QTR_SIZE_DUMMY_PIXELS	0
 #define	IMX105_QTR_SIZE_DUMMY_LINES		0
 #define	IMX105_HRZ_QTR_BLK_PIXELS	1896
-#define	IMX105_VER_QTR_BLK_LINES	58 //38//34, LGE_BSP_CAMERA::shchang@qualcomm.com ,09-16 : increased Y Blank
+#define	IMX105_VER_QTR_BLK_LINES	38//34, LGE_BSP_CAMERA::shchang@qualcomm.com ,0419
 // End LGE_BSP_CAMERA::john.park@lge.com 2011-04-27  For 1080p
 
 
@@ -211,9 +194,9 @@ struct imx105_ctrl_t {
 static uint8_t imx105_delay_msecs_stdby = 5;
 static uint16_t imx105_delay_msecs_stream = 10;
 
-// Start LGE_BSP_CAMERA::shchang@qualcomm.com 2011-05-12
-//uint8_t NR_ENABLE = 1;	//shchang@qualcomm.com : 2011-07-11
-// End LGE_BSP_CAMERA::shchang@qualcomm.com 2011-05-12
+ // Start LGE_BSP_CAMERA::shchang@qualcomm.com 2011-05-12
+uint8_t NR_ENABLE = 1;
+ // End LGE_BSP_CAMERA::shchang@qualcomm.com 2011-05-12
  
 static struct imx105_ctrl_t *imx105_ctrl;
 static DECLARE_WAIT_QUEUE_HEAD(imx105_wait_queue);
@@ -476,8 +459,7 @@ static int32_t imx105_set_fps(struct fps_cfg	*fps)
 // End LGE_BSP_CAMERA::shchang@qualcomm.com 2011-06-17
 
 
-// Start LGE_BSP_CAMERA::shchang@qualcomm.com 2011-07-11
-#if 0
+// Start LGE_BSP_CAMERA::shchang@qualcomm.com 2011-06-08
 static int32_t imx105_write_NoiseReduction(uint16_t gain)
 {
 	int32_t rc = -1;
@@ -496,14 +478,14 @@ static int32_t imx105_write_NoiseReduction(uint16_t gain)
 	printk("[QCTK] Gain = %d\n", gain);
 	//Gain : 0~234
 	//Just use Sony 2DNR option ~15 ~ 127
-	#if 0
+#if 0
 	printk("Func : NoiseReduction - Writing low light NR Value..\n");
 
 	rc = imx105_i2c_write_b_sensor(REG_2DNR_ENABLE,0x79);	
 	rc = imx105_i2c_write_b_sensor(REG_2DNR_GLINKINGSWITCH,0x0E);	
 	rc = imx105_i2c_write_b_sensor(REG_NR_STRENGTH,0x7F);	//127
 	rc = imx105_i2c_write_b_sensor(REG_NR_MFILTER_LEVEL,0x1E);	
-	#else
+#else
 	if(gain > 220)
 	{
 		printk("Func : NoiseReduction - Writing low light NR Value..\n");
@@ -549,7 +531,7 @@ static int32_t imx105_write_NoiseReduction(uint16_t gain)
 		rc = imx105_i2c_write_b_sensor(REG_NR_STRENGTH,0x0F);	//15
 		rc = imx105_i2c_write_b_sensor(REG_NR_MFILTER_LEVEL,0x1E);		
 	}
-	#endif	
+#endif	
 
 	if(rc<0)
 	{
@@ -573,82 +555,8 @@ static int32_t imx105_write_NoiseReduction(uint16_t gain)
 	return rc;
 
 }
-#endif
-// End LGE_BSP_CAMERA::shchang@qualcomm.com 2011-07-11
+// End LGE_BSP_CAMERA::shchang@qualcomm.com 2011-06-08
 
-// Start LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com 
-#ifdef SHUTTER_LAG_TEST
-static int32_t imx105_set_shutter_time(int reg_set, uint16_t gain, uint32_t line)
-{
-	int32_t rc = 0;
-	uint8_t intg_time_msb,intg_time_lsb;
-	
-	if(reg_set == SHUTTER_REGSET_FIRST)
-	{
-		printk(" %s : SHUTTER_REGSET_FIRST \n",__func__);
-		//register 1 set before setting gain 
-		imx105_i2c_write_b_sensor(0x0104,0x01);
-		imx105_i2c_write_b_sensor(0x034E,0x00);
-		imx105_i2c_write_b_sensor(0x034F,0x01);
-		imx105_i2c_write_b_sensor(0x3041,0x08);	
-	
-	}
-	else
-	{
-		printk(" %s : SHUTTER_REGSET_SECOND \n",__func__);
-		// register 1 set after setting gain
-		rc = imx105_i2c_write_w_table(
-			imx105_regs.shutter_tbl,
-			imx105_regs.shuttertbl_size);		
-
-		// delay for short frame EOF
-		usleep(200);
-
-		// compute shutter time using line value
-		intg_time_msb = (uint8_t) ((line & 0xFF00) >> 8);
-		intg_time_lsb = (uint8_t) (line & 0x00FF);	
-
-		// set the shutter time 
-		rc = imx105_i2c_write_b_sensor(REG_COARSE_INTEGRATION_TIME_HI,
-						intg_time_msb);					
-		rc = imx105_i2c_write_b_sensor(REG_COARSE_INTEGRATION_TIME_LO,
-						intg_time_lsb);
-
-		// register 2 set that separate 1080p preview and norma preview for CTS Test.
-		if(imx105_ctrl->prev_res == RES_PREVIEW_1080)
-		{
-			
-			CDBG("____  SHUTTER_REGSET PREVIEW MODE IS 1080P _____\n");
-			// When preview mode is 1080p, it need a mode register set.
-			rc = imx105_i2c_write_w_table(
-				imx105_regs.shutter2_1080p_tbl,
-				imx105_regs.shutter2_1080ptbl_size);									
-
-		}
-		else
-		{
-			CDBG("____  SHUTTER_REGSET PREVIEW MODE IS PREVIEW _____\n");
-			
-			rc = imx105_i2c_write_w_table(
-				imx105_regs.shutter2_tbl,
-				imx105_regs.shutter2tbl_size);									
-		}
-		
-		// delay for capture frame
-		msleep(2);
-
-		// register 3 set
-		imx105_i2c_write_b_sensor(0x30B1,0x03);
-		
-		snapshot_flag=SHUTTER_REGSET_NONE;		
-		
-	
-	}
-
-	return rc;
-}
-#endif
-// End LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com 
 
 static int32_t imx105_write_exp_gain(uint16_t gain, uint32_t line)
 {
@@ -699,7 +607,7 @@ static int32_t imx105_write_exp_gain(uint16_t gain, uint32_t line)
 		/* range: 0 to 234(12x) 224(8x) */
 		gain = max_legal_gain;
 
-	CDBG("[QCTK]imx105_write_exp_gain : gain = %d line = %d", gain, line);	//LGE_BSP_CAMERA::shchang@qualcomm.com
+	printk("[QCTK]imx105_write_exp_gain : gain = %d line = %d", gain, line);	//LGE_BSP_CAMERA::shchang@qualcomm.com
 
 	/* update gain registers */
 	gain_msb = (uint8_t) ((gain & 0xFF00) >> 8);
@@ -716,6 +624,15 @@ static int32_t imx105_write_exp_gain(uint16_t gain, uint32_t line)
 					GROUPED_PARAMETER_HOLD);
 	if (rc < 0)
 		return rc;
+
+	// Start LGE_BSP_CAMERA::shchang@qualcomm.com 2011-05-12
+	#if 0
+	//Change the position of the codes in the group hold routine
+	//Set NR
+	rc = imx105_write_NoiseReduction(gain);
+	if(rc<0) CDBG("Writing IMX105 Noise reduction is failed...\n");
+	#endif
+	// End LGE_BSP_CAMERA::shchang@qualcomm.com 2011-05-12 
 
 	
 	CDBG("imx105 setting REG_ANALOGUE_GAIN_CODE_GLOBAL_HI = 0x%X\n",
@@ -744,12 +661,7 @@ static int32_t imx105_write_exp_gain(uint16_t gain, uint32_t line)
 			frame_length_line_lsb);
 	if (rc < 0)
 		return rc;
-// Start LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com		
-#ifdef SHUTTER_LAG_TEST
-	if(snapshot_flag == SHUTTER_REGSET_NONE)
-	{
-#endif	
-// End LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com
+
 	CDBG("imx105 setting REG_COARSE_INTEGRATION_TIME_HI = 0x%X\n",
 					intg_time_msb);
 	rc = imx105_i2c_write_b_sensor(REG_COARSE_INTEGRATION_TIME_HI,
@@ -763,70 +675,15 @@ static int32_t imx105_write_exp_gain(uint16_t gain, uint32_t line)
 					intg_time_lsb);
 	if (rc < 0)
 		return rc;
-// Start LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com		
-#ifdef SHUTTER_LAG_TEST
-	}
-#endif	
-// End LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com
-	// Start LGE_BSP_CAMERA::shchang@qualcomm.com 2011-07-11
 
-	//real_gain = (float)(256.0 / (256.0 - (float)gain));
-	CDBG("[QCTK] Gain = %d\n", gain);
-	//Gain : 0~234
-	//Just use Sony 2DNR option ~15 ~ 127
-	if(gain > 220)
-	{
-		CDBG("Func : NoiseReduction - Writing low light NR Value..\n");
-		
-		//rc = imx105_i2c_write_b_sensor(REG_2DNR_ENABLE,0x79);	
-		//rc = imx105_i2c_write_b_sensor(REG_2DNR_GLINKINGSWITCH,0x0E);	
-		rc = imx105_i2c_write_b_sensor(REG_NR_STRENGTH,0x52);	//7f, 82
-		//rc = imx105_i2c_write_b_sensor(REG_NR_MFILTER_LEVEL,0x1E);	
-	}
-	else if(gain > 200)
-	{
-		CDBG("Func : NoiseReduction - Writing indoor NR Value..\n");
-		
-		//rc = imx105_i2c_write_b_sensor(REG_2DNR_ENABLE,0x79);	
-		//rc = imx105_i2c_write_b_sensor(REG_2DNR_GLINKINGSWITCH,0x0E);	
-		rc = imx105_i2c_write_b_sensor(REG_NR_STRENGTH,0x29);	//52
-		//rc = imx105_i2c_write_b_sensor(REG_NR_MFILTER_LEVEL,0x1E);		
-	}
-	else if(gain > 150)
-	{
-		CDBG("Func : NoiseReduction - Writing bright2 light NR Value..\n");
-		
-		//rc = imx105_i2c_write_b_sensor(REG_2DNR_ENABLE,0x79);	
-		//rc = imx105_i2c_write_b_sensor(REG_2DNR_GLINKINGSWITCH,0x0E);	
-		rc = imx105_i2c_write_b_sensor(REG_NR_STRENGTH,0x1D);	//25, //29
-		//rc = imx105_i2c_write_b_sensor(REG_NR_MFILTER_LEVEL,0x1E);		
-	}
-	else if(gain > 80)
-	{
-		CDBG("Func : NoiseReduction - Writing bright1 light NR Value..\n");
-		
-		//rc = imx105_i2c_write_b_sensor(REG_2DNR_ENABLE,0x79);	
-		//rc = imx105_i2c_write_b_sensor(REG_2DNR_GLINKINGSWITCH,0x0E);	
-		rc = imx105_i2c_write_b_sensor(REG_NR_STRENGTH,0x10);	//15
-		//rc = imx105_i2c_write_b_sensor(REG_NR_MFILTER_LEVEL,0x1E);		
-	}
-	else 
-	{
-		CDBG("Func : NoiseReduction - Writing bright1 light NR Value..\n");
-		
-		//rc = imx105_i2c_write_b_sensor(REG_2DNR_ENABLE,0x79);	
-		//rc = imx105_i2c_write_b_sensor(REG_2DNR_GLINKINGSWITCH,0x0E);	
-		rc = imx105_i2c_write_b_sensor(REG_NR_STRENGTH,0x0F);	//15
-		//rc = imx105_i2c_write_b_sensor(REG_NR_MFILTER_LEVEL,0x1E);		
-	}
-
-	if(rc<0)
-	{
-		printk("Func : NoiseReduction - Writing NR Value is failed..\n");
-		return rc;
-	}
-	// End LGE_BSP_CAMERA::shchang@qualcomm.com 2011-07-11 
-
+	// Start LGE_BSP_CAMERA::shchang@qualcomm.com 2011-05-12
+	#if 0
+	//Change the position of the codes in the group hold routine
+	//Set NR
+	rc = imx105_write_NoiseReduction(gain);
+	if(rc<0) CDBG("Writing IMX105 Noise reduction is failed...\n");
+	#endif
+	// End LGE_BSP_CAMERA::shchang@qualcomm.com 2011-05-12	
 
 	rc = imx105_i2c_write_b_sensor(REG_GROUPED_PARAMETER_HOLD,
 					GROUPED_PARAMETER_HOLD_OFF);
@@ -839,7 +696,7 @@ static int32_t imx105_write_exp_gain(uint16_t gain, uint32_t line)
 static int32_t imx105_set_pict_exp_gain(uint16_t gain, uint32_t line)
 {
 	int32_t rc = 0;
-	#if 0	//shchang@qualcomm.com : 2011-07-11
+	
 	// Start LGE_BSP_CAMERA::shchang@qualcomm.com 2011-05-12
 	if(NR_ENABLE)
 	{
@@ -848,16 +705,7 @@ static int32_t imx105_set_pict_exp_gain(uint16_t gain, uint32_t line)
 		if(rc<0) CDBG("Writing IMX105 Noise reduction is failed...\n");
 	}
 	// End LGE_BSP_CAMERA::shchang@qualcomm.com 2011-05-12 
-	#endif	
-// Start LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com 	
-#ifdef SHUTTER_LAG_TEST	
-	rc = imx105_set_shutter_time(SHUTTER_REGSET_FIRST, gain, line);	
 	rc = imx105_write_exp_gain(gain, line);
-	rc = imx105_set_shutter_time(SHUTTER_REGSET_SECOND, gain, line);
-#else
-	rc = imx105_write_exp_gain(gain, line);
-#endif
-// End LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com 
 	return rc;
 }
 
@@ -877,7 +725,7 @@ static int16_t imx105_af_init(void)
 		CDBG("%s: Error Reading EEPROM @ 0x%x\n", __func__, epromaddr);
 		return rc;
 	}
-	CDBG("%s the Infinity AF Position DAC Value is %d\n", __func__, vcmcodeinf);
+	printk("%s the Infinity AF Position DAC Value is %d\n", __func__, vcmcodeinf);
 
 	/* 1m AF Position*/
 	epromaddr = 0x001C;
@@ -886,7 +734,7 @@ static int16_t imx105_af_init(void)
 		CDBG("%s: Error Reading EEPROM @ 0x%x\n", __func__, epromaddr);
 		return rc;
 	}
-	CDBG("%s the 1m AF Position DAC Value is %d\n", __func__, vcmcode100cm);
+	printk("%s the 1m AF Position DAC Value is %d\n", __func__, vcmcode100cm);
 
 	/* 10cm AF Position*/
 	epromaddr = 0x001E;
@@ -895,7 +743,7 @@ static int16_t imx105_af_init(void)
 		CDBG("%s: Error Reading EEPROM @ 0x%x\n", __func__, epromaddr);
 		return rc;
 	}
-	CDBG("%s the 10cm AF Position DAC Value is %d\n", __func__, vcmcode10cm);
+	printk("%s the 10cm AF Position DAC Value is %d\n", __func__, vcmcode10cm);
 
 	/* Start current*/
 	epromaddr = 0x0020;
@@ -904,7 +752,7 @@ static int16_t imx105_af_init(void)
 		CDBG("%s: Error Reading EEPROM @ 0x%x\n", __func__, epromaddr);
 		return rc;
 	}
-	CDBG("%s the vcm  Start current DAC Value is %d\n", __func__, vcmcodesc);
+	printk("%s the vcm  Start current DAC Value is %d\n", __func__, vcmcodesc);
 
 	/*Operating sensitivity*/
 	epromaddr = 0x0022; 
@@ -913,7 +761,7 @@ static int16_t imx105_af_init(void)
 		CDBG("%s: Error Reading EEPROM @ 0x%x\n", __func__, epromaddr);
 		return rc;
 	}
-	CDBG("%s the vcm Operating sensitivity DAC Value is %d\n", __func__, vcmcodeos);
+	printk("%s the vcm Operating sensitivity DAC Value is %d\n", __func__, vcmcodeos);
 	af_infinity = vcmcodesc;
 	af_optical_infinity = vcmcodeinf;
 	imx105_step_position_table[0] = af_optical_infinity;
@@ -934,7 +782,7 @@ static int16_t imx105_af_init(void)
 	
 	imx105_ctrl->curr_lens_pos = 0;
 
-	CDBG("%s imx105_ctrl->curr_lens_pos = %d\n", __func__, imx105_ctrl->curr_lens_pos);
+	printk("%s imx105_ctrl->curr_lens_pos = %d\n", __func__, imx105_ctrl->curr_lens_pos);
 	
 	return rc;
 }
@@ -1048,17 +896,6 @@ static int32_t imx105_sensor_setting(int update_type, int rt)
 				if (rc < 0)
 					return rc;
 
-			#if 1		//shchang@qualcomm.com : 2011-07-11
-			printk("Func : Init - Writing bright1 light NR Value..\n");
-
-			rc = imx105_i2c_write_b_sensor(REG_2DNR_ENABLE,0x79);	
-			rc = imx105_i2c_write_b_sensor(REG_2DNR_GLINKINGSWITCH,0x0E);	
-			rc = imx105_i2c_write_b_sensor(REG_NR_STRENGTH,0x0F);	//15
-			rc = imx105_i2c_write_b_sensor(REG_NR_MFILTER_LEVEL,0x1E);	
-
-			if (rc < 0)
-				return rc;
-			#endif
 
 			rc = imx105_i2c_write_w_table(imx105_regs.init_tbl,
 				imx105_regs.inittbl_size);
@@ -1080,41 +917,51 @@ static int32_t imx105_sensor_setting(int update_type, int rt)
 
 	case UPDATE_PERIODIC:
 		// Start LGE_BSP_CAMERA::john.park@lge.com 2011-04-27  For 1080p 
-// Start LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com		
-#ifdef SHUTTER_LAG_TEST
-		if (rt == RES_PREVIEW ||  rt == RES_PREVIEW_1080) {
-#else
 		if (rt == RES_PREVIEW || rt == RES_CAPTURE || rt == RES_PREVIEW_1080) {
-#endif		
-// End LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com
 		// End LGE_BSP_CAMERA::john.park@lge.com 2011-04-27  For 1080p
 			CDBG("%s: %d\n", __func__, __LINE__);
-//Start : LGE BSP_CAMERA shchang@qualcomm.com 09-19- More stable MIPI Sequence
 
-			/* 1. Stop streaming */
+			/* config mipi csi controller */
+			if (config_csi == 0) {
+				imx105_csi_params.lane_cnt = 2;
+				imx105_csi_params.data_format = CSI_10BIT;
+				imx105_csi_params.lane_assign = 0xe4;
+				imx105_csi_params.dpcm_scheme = 0;
+				imx105_csi_params.settle_cnt = 0x14;
+
+				rc = msm_camio_csi_config(&imx105_csi_params);
+				if (rc < 0)
+					CDBG("config csi controller failed\n");
+
+				msleep(imx105_delay_msecs_stream);
+				config_csi = 1;
+			}
+			/* stop streaming */
 			rc = imx105_i2c_write_b_sensor(REG_MODE_SELECT,
 				MODE_SELECT_STANDBY_MODE);
 			if (rc < 0)
 				return rc;
-
-			/* 2. Delay for stopping streaming */
 			msleep(imx105_delay_msecs_stdby);
-
 			rc = imx105_i2c_write_b_sensor(
 				REG_GROUPED_PARAMETER_HOLD,
 				GROUPED_PARAMETER_HOLD);
 				if (rc < 0)
 					return rc;
+			#if 0
+			//Noise reduction : LGE_BSP_CAMERA::shchang@qualcomm.com
+			CDBG("Func : NoiseReduction - Writing Default NR Value..\n");
+		
+			rc = imx105_i2c_write_b_sensor(REG_2DNR_ENABLE,0x79);	
+			rc = imx105_i2c_write_b_sensor(REG_2DNR_GLINKINGSWITCH,0x0E);	
+			rc = imx105_i2c_write_b_sensor(REG_NR_STRENGTH,0x23);	
+			rc = imx105_i2c_write_b_sensor(REG_NR_MFILTER_LEVEL,0x1E);	
 
-			/* 3. Write sensor setting */
+			if(rc < 0)
+				return rc;
+			#endif			
+	
 			/* write mode settings */
 			if (rt == RES_PREVIEW) {
-// Start LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com			
-#ifdef SHUTTER_LAG_TEST
-				snapshot_flag = SHUTTER_REGSET_NONE;
-#endif
-// End LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com
-
 				rc = imx105_i2c_write_w_table(
 					imx105_regs.prev_tbl,
 					imx105_regs.prevtbl_size);
@@ -1143,25 +990,6 @@ static int32_t imx105_sensor_setting(int update_type, int rt)
 				GROUPED_PARAMETER_HOLD_OFF);
 			if (rc < 0)
 				return rc;
-
-			/* 4. CSID/CSI - PHY registers configuration*/
-			/* config mipi csi controller */
-			if (config_csi == 0) {
-				imx105_csi_params.lane_cnt = 2;
-				imx105_csi_params.data_format = CSI_10BIT;
-				imx105_csi_params.lane_assign = 0xe4;
-				imx105_csi_params.dpcm_scheme = 0;
-				imx105_csi_params.settle_cnt = 0x14;
-
-				rc = msm_camio_csi_config(&imx105_csi_params);
-				if (rc < 0)
-					CDBG("config csi controller failed\n");
-
-				msleep(imx105_delay_msecs_stream);
-				config_csi = 1;
-			}
-
-			/* 5. stop streaming */
 			CDBG("IMX105 Turn on streaming\n");
 
 			/* turn on streaming */
@@ -1171,16 +999,6 @@ static int32_t imx105_sensor_setting(int update_type, int rt)
 				return rc;
 			msleep(imx105_delay_msecs_stream);
 		}
-//End : LGE BSP_CAMERA : shchang@qualcomm.com 09-19
-// Start LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com		
-#ifdef SHUTTER_LAG_TEST		
-		else if(rt == RES_CAPTURE)
-		{
-				snapshot_flag = SHUTTER_REGSET_STARTED;
-		}
-#endif		
-// End LGE_BSP_CAMERA : shutter time reg table - jonghwan.ko@lge.com
-		
 		break;
 	default:
 		rc = -EINVAL;
@@ -1303,9 +1121,6 @@ static int imx105_probe_init_done(const struct msm_camera_sensor_info *data)
 {
 	gpio_set_value_cansleep(data->sensor_reset, 0);
 	gpio_free(data->sensor_reset);
-// Start LGE_BSP_CAMERA::john.park@lge.com 2011-06-03  separation of camera power
-	imx105_ctrl->sensordata->pdata->camera_power_off();
-// End LGE_BSP_CAMERA::john.park@lge.com 2011-06-03  separation of camera power	
 	return 0;
 }
 
@@ -1316,13 +1131,7 @@ static int imx105_read_eeprom_data(struct sensor_cfg_data *cfg)
 	uint16_t eepromdata = 0;
 	//uint8_t addr = 0;
 	uint16_t addr = 0;
-#ifdef USE_LG_fast_af
-	uint8_t i;
-	uint16_t fastaf_stepsize = 0;
-	//uint16_t fastaf_totalstepmargin = 1;
-	uint16_t fastaf_infinitymargin = 30;
-	uint16_t fastaf_macromargin = 30;
-#endif
+
 	printk("[QCTK_EEPROM] Start reading EEPROM\n");
 
 	//Start for Read debigging
@@ -1364,72 +1173,6 @@ static int imx105_read_eeprom_data(struct sensor_cfg_data *cfg)
 	}
 	cfg->cfg.calib_info.gr_over_gb = eepromdata;
 
-#ifdef USE_LG_fast_af
-	// infinity af position
-	addr = 0x001A;
-	rc = imx105_i2c_read_w_eeprom(addr, &eepromdata);
-	if (rc < 0) {
-		CDBG("%s: Error Reading EEPROM @ 0x%x\n", __func__, addr);
-		return rc;
-	}
-	cfg->cfg.calib_info.af_pos_inf = eepromdata;
-	printk("[QCTK_EEPROM] af_pos_inf = %d\n", cfg->cfg.calib_info.af_pos_inf);	
-	
-	// 1m af position
-	addr = 0x1C; // sungmin.woo
-	rc = imx105_i2c_read_w_eeprom(addr, &eepromdata);
-	if (rc < 0) {
-		CDBG("%s: Error Reading EEPROM @ 0x%x\n", __func__, addr);
-		return rc;
-	}
-	cfg->cfg.calib_info.af_pos_1m = eepromdata;
-	printk("[QCTK_EEPROM] af_pos_1m = %d\n", cfg->cfg.calib_info.af_pos_1m);	
-	
-	// 100mm(macro) af position
-	addr = 0x1E; // sungmin.woo let's use this for 100mm af position
-	rc = imx105_i2c_read_w_eeprom(addr, &eepromdata);
-	if (rc < 0) {
-		CDBG("%s: Error Reading EEPROM @ 0x%x\n", __func__, addr);
-		return rc;
-	}
-	cfg->cfg.calib_info.stroke_amt = eepromdata;
-	printk("[QCTK_EEPROM] macro pos = %d\n", cfg->cfg.calib_info.stroke_amt);	
-
-	//remaining parameter
-
-	cfg->cfg.calib_info.macro_2_inf =  cfg->cfg.calib_info.stroke_amt - cfg->cfg.calib_info.af_pos_inf;
-	printk("[QCTK_EEPROM] macro_2_inf = %d\n", cfg->cfg.calib_info.macro_2_inf);	
-	cfg->cfg.calib_info.inf_2_macro = cfg->cfg.calib_info.macro_2_inf;
-	printk("[QCTK_EEPROM] inf_2_macro = %d\n", cfg->cfg.calib_info.inf_2_macro);	
-
-	
-	printk("Reset focus range from eeprom for fast af\n");	
-	printk("**********************************\n");
-	fastaf_infinitymargin = (uint16_t)(cfg->cfg.calib_info.af_pos_inf/10);
-	fastaf_macromargin = fastaf_infinitymargin;
-	printk("fastaf_infinitymargin = %d\n", fastaf_infinitymargin);	
-	fastaf_stepsize =  (uint16_t)((cfg->cfg.calib_info.macro_2_inf + fastaf_infinitymargin + fastaf_macromargin )/(IMX105_TOTAL_STEPS_NEAR_TO_FAR));
-	imx105_step_position_table[0] = cfg->cfg.calib_info.af_pos_inf - fastaf_infinitymargin;
-	imx105_l_region_code_per_step = fastaf_stepsize;
-	printk("imx105_l_region_code_per_step = %d\n", fastaf_stepsize);	
-	
-	for (i = 1; i <= IMX105_TOTAL_STEPS_NEAR_TO_FAR; i++)
-	{	
-		imx105_step_position_table[i] = imx105_step_position_table[i-1] + imx105_l_region_code_per_step;
-	}
-
-	for(i = 0; i <= IMX105_TOTAL_STEPS_NEAR_TO_FAR; i++)
-	{	
-		printk("imx105_step_position_table[%d] = [%d]\n",i, imx105_step_position_table[i]);	
-	}
-
-	AF_OPTICAL_INFINITY = cfg->cfg.calib_info.af_pos_inf - fastaf_infinitymargin;
-	//AF_OPTICAL_INFINITY = 0;
-	printk("AF_OPTICAL_INFINITY = %d\n", AF_OPTICAL_INFINITY);	
-	
-	printk("**********************************\n");	
-
-#else
 	//: Infinite AF Position
 	addr = 0x001A;
 	rc = imx105_i2c_read_w_eeprom(addr, &eepromdata);
@@ -1474,7 +1217,7 @@ static int imx105_read_eeprom_data(struct sensor_cfg_data *cfg)
 		return rc;
 	}
 	cfg->cfg.calib_info.af_pos_inf = eepromdata;
-#endif
+
 	return rc;
 }
 // End LGE_BSP_CAMERA::shchang@qualcomm.com 2011-06-24 
@@ -1536,11 +1279,6 @@ int  is_imx105_sensor_open(void)
 }
 #endif
 
-#ifdef LGIT_IEF_SWITCH
-extern int mipi_lgit_lcd_ief_off(void);
-extern int mipi_lgit_lcd_ief_on(void);
-#endif
-
 int imx105_sensor_open_init(const struct msm_camera_sensor_info *data)
 {
 	int32_t rc = 0;
@@ -1567,26 +1305,15 @@ int imx105_sensor_open_init(const struct msm_camera_sensor_info *data)
 #ifdef MSM_ROTATOR_IOCTL_CHECK
 	sensor_open = 1;
 #endif
-
-// Start LGE_BSP_CAMERA::john.park@lge.com 2011-06-03  separation of camera power
-	data->pdata->camera_power_on();
-	if (rc < 0) {
-		printk(KERN_ERR "[ERROR]%s:failed to power on!\n", __func__);
-		return rc;
-	}
+	/* enable mclk first */
 	msm_camio_clk_rate_set(IMX105_DEFAULT_MASTER_CLK_RATE);
-	
+	msleep(20);
+
 	rc = imx105_probe_init_sensor(data);
 	if (rc < 0) {
 		CDBG("Calling imx105_sensor_open_init fail\n");
 		goto probe_fail;
 	}
-
-#ifdef LGIT_IEF_SWITCH
-	mipi_lgit_lcd_ief_off();
-#endif
-	
-// End LGE_BSP_CAMERA::john.park@lge.com 2011-06-03  separation of camera power
 	CDBG("%s: %d\n", __func__, __LINE__);
 	rc = imx105_sensor_setting(REG_INIT, RES_PREVIEW);
 	CDBG("%s: %d\n", __func__, __LINE__);
@@ -1821,19 +1548,10 @@ static int imx105_sensor_release(void)
 	gpio_set_value_cansleep(imx105_ctrl->sensordata->sensor_reset,
 		0);
 	gpio_free(imx105_ctrl->sensordata->sensor_reset);
-
-// Start LGE_BSP_CAMERA::john.park@lge.com 2011-06-03  separation of camera power
-	imx105_ctrl->sensordata->pdata->camera_power_off();
-// End LGE_BSP_CAMERA::john.park@lge.com 2011-06-03  separation of camera power
-	
 	kfree(imx105_ctrl);
 	imx105_ctrl = NULL;
 	CDBG("imx105_release completed\n");
 	mutex_unlock(&imx105_mut);
-
-#ifdef LGIT_IEF_SWITCH
-	mipi_lgit_lcd_ief_on();
-#endif
 
 #ifdef MSM_ROTATOR_IOCTL_CHECK	
 	sensor_open = 0;
@@ -1852,6 +1570,8 @@ static int imx105_sensor_probe(const struct msm_camera_sensor_info *info,
 		rc = -ENOTSUPP;
 		goto probe_fail;
 	}
+	msm_camio_clk_rate_set(IMX105_DEFAULT_MASTER_CLK_RATE);
+	rc = imx105_probe_init_sensor(info);
 	if (rc < 0)
 		goto probe_fail;
 	s->s_init = imx105_sensor_open_init;
@@ -1859,6 +1579,7 @@ static int imx105_sensor_probe(const struct msm_camera_sensor_info *info,
 	s->s_config  = imx105_sensor_config;
 	s->s_camera_type = BACK_CAMERA_2D;
 	s->s_mount_angle  = 90; // fix camera sensor orientation by john.park@lge.com
+	imx105_probe_init_done(info);
 
 	return rc;
 

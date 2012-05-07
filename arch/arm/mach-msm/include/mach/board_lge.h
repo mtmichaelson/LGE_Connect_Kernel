@@ -15,7 +15,7 @@
 
 #ifndef __ASM_ARCH_MSM_BOARD_LGE_H
 #define __ASM_ARCH_MSM_BOARD_LGE_H
-#endif
+
 
 #include <linux/types.h>
 #include <linux/list.h>
@@ -25,8 +25,8 @@
 #include <linux/platform_device.h>
 #include <asm/setup.h>
 
-//add msm_rotator_control_status
-#undef MSM_ROTATOR_IOCTL_CHECK
+//jinho.jang - add msm_rotator_control_status
+#define MSM_ROTATOR_IOCTL_CHECK
 
 #if 1 /* CONFIG_LGE_BOARD_SUPPORT */
 enum {
@@ -63,21 +63,6 @@ enum {
 extern int lge_cable_type;
 #endif
 #endif
-
-
-/* 20110613 hoyeon.jang@lge.com [START] */
-enum {
-  LGE_I_BOARD_ATNT = 0,
-  LGE_I_BOARD_DCM,
-  LGE_I_BOARD_SKT,
-  LGE_I_BOARD_VZW,
-  LGE_I_BOARD_LGU,
-  LGE_I_BOARD_MAX,
-};
-
-extern int lge_bd_target;
-/* 20110613 hoyeon.jang@lge.com [END] */
-
 
 #ifdef CONFIG_LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
 enum {
@@ -230,29 +215,14 @@ struct atcmd_virtual_platform_data {
 	unsigned char *keycode;
 };
 
-/* 20110616 hoyeon.jang@lge.com add mhl platformdata struct [START] */
-/* mhl platform data */
-struct mhl_platform_data {
-  unsigned int is_support;
-  unsigned int interrupt_pin;
-  unsigned int reset_pin;
-  unsigned int select_pin;
-  unsigned int wakeup_pin;
-  char         ldo_id_1v2[12];
-  char         ldo_id_1v8[12];
-  char         ldo_id_3v3[12];
-  int (*power)(int on);
-  int (*power_config)(void);
-};
-/* 20110616 hoyeon.jang@lge.com add mhl platform data struct [END] */
-
 /* implement in devices_lge.c */
 void __init lge_add_atcmd_virtual_kbd_device(void);
 void __init lge_add_eta_event_log_device(void);
 
 
 #ifdef MSM_ROTATOR_IOCTL_CHECK
-int  is_imx105_sensor_open(void);
+int  is_mt9p017_sensor_open(void);
 void set_rotator_ctl_result(int result);
 int get_rotator_ctl_result(void);
+#endif
 #endif

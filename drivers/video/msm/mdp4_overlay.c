@@ -463,9 +463,10 @@ static void mdp4_overlay_vg_get_src_offset(struct mdp4_overlay_pipe *pipe,
 		switch (pipe->src_format) {
 		case MDP_Y_CR_CB_H2V2:
 		case MDP_Y_CB_CR_H2V2:
+			//3161B camera zoom err workaround
 			if (pipe->src_x & 0x1)
-				pipe->src_x += 1;			
-
+				pipe->src_x += 1;
+			
 			*luma_off = pipe->src_x;
 			*chroma_off = pipe->src_x/2;
 			break;
@@ -478,9 +479,10 @@ static void mdp4_overlay_vg_get_src_offset(struct mdp4_overlay_pipe *pipe,
 		case MDP_Y_CBCR_H1V1:
 		case MDP_Y_CRCB_H2V1:
 		case MDP_Y_CBCR_H2V1:
+			//3161B camera zoom err workaround
 			if (pipe->src_x & 0x1)
 				pipe->src_x += 1;
-
+			
 			*luma_off = pipe->src_x;
 			*chroma_off = pipe->src_x;
 			break;
@@ -1052,7 +1054,7 @@ void mdp4_overlayproc_cfg(struct mdp4_overlay_pipe *pipe)
 		bpp = 2;  /* overlay ouput is RGB565 */
 #else
 		bpp = 3;  /* overlay ouput is RGB888 */
-#endif
+#endif										
 		data = pipe->src_height;
 		data <<= 16;
 		data |= pipe->src_width;
@@ -1975,7 +1977,7 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 		return -ENODEV;
 	}
 
-if (!mfd->panel_power_on)	/* suspended */
+	if (!mfd->panel_power_on)	/* suspended */
 		return -EPERM;
 
 	if (req->src.format == MDP_FB_FORMAT)
@@ -1995,6 +1997,8 @@ if (!mfd->panel_power_on)	/* suspended */
 
 //jinho.jang - mdp underrun issue fix 
 #ifdef CONFIG_LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
+	perf_level = 1;
+#elif defined(CONFIG_LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT) || defined(CONFIG_LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT)
 	perf_level = 1;
 #endif
 	if ((mfd->panel_info.type == LCDC_PANEL) &&
@@ -2079,6 +2083,7 @@ if (!mfd->panel_power_on)	/* suspended */
 	}
 
 	mutex_unlock(&mfd->dma->ov_mutex);
+
 
 #ifdef CONFIG_MSM_BUS_SCALING
 	if (pipe->mixer_num == MDP4_MIXER0) {

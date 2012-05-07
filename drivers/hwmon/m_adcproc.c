@@ -27,19 +27,14 @@
 
 #ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
 const struct adc_map_pt adcmap_batttherm[THERM_LAST] = {
-#if 1 // from AT&T 2011-05-31
-	{1500,   -8},
-	{1430,   -3},
-#else
 	{1574,	-10},
 	{1477,	 -5},
-#endif
 	{946,	 42},
 	{933,	 45},
 	{901,	 55},
 	{896,	 57},
 	{889,	 60},
-	{878,	 64},
+	{878,	 65},
 };
 #else
 static const struct adc_map_pt adcmap_batttherm[] = {

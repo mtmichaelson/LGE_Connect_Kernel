@@ -1,0 +1,12 @@
+--- com_device/misc/muic.c
++++ com_device/misc/muic.c
+@@ -23,7 +23,8 @@
+ #include <linux/wakelock.h>
+ #include <linux/i2c/twl.h>		//for akm power
+ #include <linux/regulator/consumer.h>	//for akm power
+-#include <muic.h>
++//#include <muic.h>
++#include "muic.h"
+ #include <linux/mfd/pmic8058.h>
+ 
+ /* Macros assume PMIC GPIOs start at 0 */

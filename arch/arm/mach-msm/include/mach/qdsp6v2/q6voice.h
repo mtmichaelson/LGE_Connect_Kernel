@@ -279,18 +279,6 @@ struct mvm_set_voice_timing_cmd {
 #define VSS_ISTREAM_CMD_STOP_PLAYBACK			0x00011239
 /* Stop the in-call music delivery on the Tx voice path. */
 
-//~~ [START] 2011.06.09 hj74.kim mvs loop back qualqumm patch
-#define VSS_NETWORK_ID_CDMA_NB				0x00010021
-#define VSS_NETWORK_ID_CDMA_WB				0x00010022
-#define VSS_NETWORK_ID_CDMA_WV				0x00011100
-#define VSS_NETWORK_ID_GSM_NB				0x00010023
-#define VSS_NETWORK_ID_GSM_WB				0x00010024
-#define VSS_NETWORK_ID_GSM_WV				0x00011101
-#define VSS_NETWORK_ID_WCDMA_NB				0x00010025
-#define VSS_NETWORK_ID_WCDMA_WB				0x00010026
-#define VSS_NETWORK_ID_WCDMA_WV				0x00011102
-//~~ [END] hj74.kim mvs loop back qualqumm patch
-
 struct vss_istream_cmd_create_passive_control_session_t {
 	char name[SESSION_NAME_LEN];
 	/**<
@@ -538,9 +526,17 @@ struct cvs_start_record_cmd {
 #define VSS_NETWORK_ID_VOIP_WB				0x00011241
 #define VSS_NETWORK_ID_VOIP_WV				0x00011242
 
+/* Network acdb IDs    ew0804.kim */
+#define VSS_NETWORK_ID_CDMA_NB	0x00010021
+#define VSS_NETWORK_ID_CDMA_WB	0x00010022
+
 /* Media types */
 #define VSS_MEDIA_ID_EVRC_MODEM		0x00010FC2
 /* 80-VF690-47 CDMA enhanced variable rate vocoder modem format. */
+#define VSS_MEDIA_ID_4GV_NB_MODEM  0x00010FC3
+/* 4GV Narrowband modem format */
+#define VSS_MEDIA_ID_4GV_WB_MODEM  0x00010FC4
+/* 4GV Wideband modem format */
 #define VSS_MEDIA_ID_AMR_NB_MODEM	0x00010FC6
 /* 80-VF690-47 UMTS AMR-NB vocoder modem format. */
 #define VSS_MEDIA_ID_AMR_WB_MODEM	0x00010FC7
@@ -669,10 +665,17 @@ typedef void (*dl_cb_fn)(uint8_t *voc_pkt,
 			 void *private_data);
 
 
+struct q_min_max_rate {
+	uint32_t min_rate;
+	uint32_t max_rate;
+};
+
+
 struct mvs_driver_info {
 	uint32_t media_type;
 	uint32_t rate;
 	uint32_t network_type;
+	struct q_min_max_rate min_max_rate;	
 	uint32_t dtx_mode;
 	ul_cb_fn ul_cb;
 	dl_cb_fn dl_cb;
@@ -762,7 +765,9 @@ void voice_register_mvs_cb(ul_cb_fn ul_cb,
 void voice_config_vocoder(uint32_t media_type,
 			  uint32_t rate,
 			  uint32_t network_type,
-			  uint32_t dtx_mode);
+			  uint32_t dtx_mode,
+			  struct q_min_max_rate min_max_rate);
+
 
 int voice_start_record(uint32_t rec_mode, uint32_t set);
 

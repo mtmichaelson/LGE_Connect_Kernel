@@ -133,9 +133,6 @@ struct kgsl_shadowprop {
 struct kgsl_pwrlevel {
 	unsigned int gpu_freq;
 	unsigned int bus_freq;
-#ifndef QCT_PATCH_GPU_IO_FRACTION
-	unsigned int io_fraction;
-#endif
 };
 
 struct kgsl_version {

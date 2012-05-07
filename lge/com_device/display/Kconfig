@@ -16,6 +16,12 @@ config LGE_BACKLIGHT_LM3530
 	---help---
 	LGE backlight management (lm3530)
 
+config LGE_BACKLIGHT_LM3537
+	bool "select lm3537 device as LGE backlight management for Cayman "
+	default y
+	---help---
+	LGE backlight management (lm3537)
+
 choice
 	prompt "LGE Display Selection"
 	default LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT 
@@ -28,6 +34,18 @@ config LGE_DISPLAY_MIPI_SHARP_VIDEO_WVGA_PT
 
 config LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
 	bool "LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT"
+	select FB_MSM_MIPI_DSI
+	---help---
+	LGE display management 
+
+config LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT
+	bool "LGE_DISPLAY_MIPI_LGD_VIDEO_WVGA_PT"
+	select FB_MSM_MIPI_DSI
+	---help---
+	LGE display management 
+
+config LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT
+	bool "LGE_DISPLAY_MIPI_LGD_CMD_WVGA_PT"
 	select FB_MSM_MIPI_DSI
 	---help---
 	LGE display management 
@@ -72,4 +90,9 @@ config LGE_BOOTLOADER_DISP_INIT
 	---help---
 	select this feature for LGE Bootloader Display support
 
+config LGE_KEY_BACKLIGHT_ALC
+	bool "LGE_KEY_BACKLIGHT_ALC"
+	default y
+	---help---
+	select this feature for key backlight off when lux value is over 100
 endmenu

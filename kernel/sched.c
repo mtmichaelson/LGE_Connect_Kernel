@@ -1843,19 +1843,8 @@ static void set_load_weight(struct task_struct *p)
 	p->se.load.inv_weight = prio_to_wmult[p->static_prio - MAX_RT_PRIO];
 }
 
-#ifdef CONFIG_LG_SYSPROF
-#include "sched_prof.c"
-#endif
-
 static void enqueue_task(struct rq *rq, struct task_struct *p, int flags)
 {
-
-#ifdef CONFIG_LG_SYSPROF
-	if (flags & ENQUEUE_WAKEUP) {
-		p->state_flags |= TASK_WAKEUP;
-	}
-#endif
-
 	update_rq_clock(rq);
 	sched_info_queued(p);
 	p->sched_class->enqueue_task(rq, p, flags);
@@ -1864,12 +1853,6 @@ static void enqueue_task(struct rq *rq, struct task_struct *p, int flags)
 
 static void dequeue_task(struct rq *rq, struct task_struct *p, int flags)
 {
-
-#ifdef CONFIG_LG_SYSPROF
-	if (flags & DEQUEUE_SLEEP) {
-		p->state_flags |= TASK_SLEEP;
-	}
-#endif
 	update_rq_clock(rq);
 	sched_info_dequeued(p);
 	p->sched_class->dequeue_task(rq, p, flags);
@@ -2018,9 +2001,6 @@ void set_task_cpu(struct task_struct *p, unsigned int new_cpu)
 	trace_sched_migrate_task(p, new_cpu);
 
 	if (task_cpu(p) != new_cpu) {
-#ifdef CONFIG_LG_SYSPROF
-		p->state_flags |= TASK_MIGRATION;
-#endif
 		p->se.nr_migrations++;
 		perf_sw_event(PERF_COUNT_SW_CPU_MIGRATIONS, 1, 1, NULL, 0);
 	}
@@ -3758,11 +3738,6 @@ need_resched_nonpreemptible:
 	next = pick_next_task(rq);
 	clear_tsk_need_resched(prev);
 	rq->skip_clock_update = 0;
-
-#ifdef CONFIG_LG_SYSPROF
-	if (unlikely(task_trace_flag))
-		trace_sched_sysprof(cpu, rq, prev, next);
-#endif
 
 	if (likely(prev != next)) {
 		sched_info_switch(prev, next);

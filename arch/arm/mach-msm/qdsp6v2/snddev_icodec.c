@@ -556,12 +556,14 @@ static int snddev_icodec_close_rx(struct snddev_icodec_state *icodec)
 
 	wake_lock(&drv->rx_idlelock);
 
-	if (drv->snddev_vreg)
-		vreg_mode_vote(drv->snddev_vreg, 0, SNDDEV_HIGH_POWER_MODE);
-
 	/* Disable power amplifier */
 	if (icodec->data->pamp_off)
 		icodec->data->pamp_off();
+
+
+	if (drv->snddev_vreg)
+		vreg_mode_vote(drv->snddev_vreg, 0, SNDDEV_HIGH_POWER_MODE);
+
 
 	/* Disable ADIE */
 	if (icodec->adie_path) {

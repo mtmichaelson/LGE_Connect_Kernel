@@ -32,7 +32,6 @@
 //#define PN544_PROTOCOL_ANALYZE_ENABLED
 //20110421, seunghyup.ryoo@lge.com,  [END]
 
-
 struct pn544_dev	{
 	wait_queue_head_t	read_wq;
 	struct mutex		read_mutex;
@@ -172,18 +171,17 @@ static ssize_t pn544_dev_read(struct file *filp, char __user *buf,
 	/* Read data */
 //20110328, seunghyup.ryoo@lge.com,  [START]
 	memset(tmp, 0x00, MAX_BUFFER_SIZE);
-//20110328, seunghyup.ryoo@lge.com,  [END]
-
 	ret = i2c_master_recv(pn544_dev->client, tmp, count);
-
+//	ret = pn544_i2c_recv(pn544_dev->client, tmp, count);
+//20110328, seunghyup.ryoo@lge.com,  [END]
 	mutex_unlock(&pn544_dev->read_mutex);
 
 	if (ret < 0) {
-		printk("%s: i2c_master_recv returned %d\n", __func__, ret);
+		pr_err("%s: i2c_master_recv returned %d\n", __func__, ret);
 		return ret;
 	}
 	if (ret > count) {
-		printk("%s: received too many bytes from i2c (%d)\n",
+		pr_err("%s: received too many bytes from i2c (%d)\n",
 			__func__, ret);
 		return -EIO;
 	}
@@ -617,31 +615,6 @@ static int pn544_remove(struct i2c_client *client)
 	return 0;
 }
 
-//20110825, seunghyup.ryoo@lge.com, Power Off Sequence [START]
-static void pn544_shutdown(struct i2c_client *client)
-{
-	struct pn544_dev *pn544_dev;
-
-	printk("================ pn544_shutdown() start ================\n");
-
-	// Get PN544 Device Structure data
-	pn544_dev = i2c_get_clientdata(client);
-
-	// Make all output GPIOs to Low
-	gpio_set_value(pn544_dev->ven_gpio, 0);
-	gpio_set_value(pn544_dev->firm_gpio, 0);
-	msleep(10);
-	printk("Output GPIO Status : VEN = %d, FIRM = %d\n", 
-			gpio_get_value(pn544_dev->ven_gpio), 
-			gpio_get_value(pn544_dev->firm_gpio));
-
-	printk("================ pn544_shutdown() end ================\n");
-
-	return;
-}
-//20110825, seunghyup.ryoo@lge.com,  [END]
-
-
 static const struct i2c_device_id pn544_id[] = {
 	{ "pn544", 0 },
 	{ }
@@ -651,9 +624,6 @@ static struct i2c_driver pn544_driver = {
 	.id_table	= pn544_id,
 	.probe		= pn544_probe,
 	.remove		= pn544_remove,
-//20110825, seunghyup.ryoo@lge.com, Power Off Sequence [START]
-	.shutdown	= pn544_shutdown,
-//20110825, seunghyup.ryoo@lge.com,  [END]	
 	.driver		= {
 		.owner	= THIS_MODULE,
 		.name	= "pn544",

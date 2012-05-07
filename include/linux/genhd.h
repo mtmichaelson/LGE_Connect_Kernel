@@ -56,8 +56,13 @@ enum {
 	MINIX_PARTITION = 0x81,		/* Minix Partition ID */
 	UNIXWARE_PARTITION = 0x63,	/* Same as GNU_HURD and SCO Unix */
 };
-
+/*LGE_DEV_START dy.lee page allocation failure about SD Device */
+#if 0
 #define DISK_MAX_PARTS			256
+#else
+#define DISK_MAX_PARTS			64
+#endif 
+/*LGE_DEV_END dy.lee page allocation failure about SD Device */
 #define DISK_NAME_LEN			32
 
 #include <linux/major.h>

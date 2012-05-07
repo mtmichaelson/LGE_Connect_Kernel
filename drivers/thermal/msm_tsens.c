@@ -444,6 +444,7 @@ static void notify_uspace_tsens_fn(struct work_struct *work)
 					NULL, "type");
 }
 
+#if 0 //byongdoo.oh@lge.com workaround code to block idle lock up
 static irqreturn_t tsens_isr(int irq, void *data)
 {
 	unsigned int reg = readl(TSENS_CNTL_ADDR);
@@ -498,12 +499,14 @@ static irqreturn_t tsens_isr_thread(int irq, void *data)
 	dsb();
 	return IRQ_HANDLED;
 }
+#endif
 
 static int __devinit tsens_tm_probe(struct platform_device *pdev)
 {
 	unsigned int reg, i, calib_data, calib_data_backup;
+#if 0 //byongdoo.oh@lge.com workaround code to block idle lock up
 	int rc;
-
+#endif
 	calib_data = (readl(TSENS_QFPROM_ADDR) & TSENS_QFPROM_TEMP_SENSOR0_MASK)
 					>> TSENS_QFPROM_TEMP_SENSOR0_SHIFT;
 	calib_data_backup = readl(TSENS_QFPROM_ADDR)
@@ -569,6 +572,7 @@ static int __devinit tsens_tm_probe(struct platform_device *pdev)
 		tmdev->sensor[i].mode = THERMAL_DEVICE_DISABLED;
 	}
 
+#if 0 //byongdoo.oh@lge.com workaround code to block idle lock up
 	rc = request_threaded_irq(TSENS_UPPER_LOWER_INT, tsens_isr,
 		tsens_isr_thread, 0, "tsens", tmdev);
 	if (rc < 0) {
@@ -576,6 +580,7 @@ static int __devinit tsens_tm_probe(struct platform_device *pdev)
 		kfree(tmdev);
 		return rc;
 	}
+#endif
 	writel(reg & ~((((1 << TSENS_NUM_SENSORS) - 1) << 3)
 			| TSENS_SLP_CLK_ENA | TSENS_EN), TSENS_CNTL_ADDR);
 	pr_notice("%s: OK\n", __func__);

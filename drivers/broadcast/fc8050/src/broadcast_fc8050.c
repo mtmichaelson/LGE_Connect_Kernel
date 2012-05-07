@@ -17,8 +17,6 @@
 #include "../inc/fci_types.h"
 #include "../inc/bbm.h"
 
-#include <linux/mfd/pmic8058.h>	//I-pjt
-
 /* external function */
 extern int broadcast_drv_if_isr(void);
 extern void fc8050_isr_interruptclear(void);
@@ -36,9 +34,6 @@ static int broadcast_tdmb_fc8050_resume(struct spi_device *spi);
 #define DMB_RESET_N 	101 //GPIO 101
 #define DMB_ANT_SEL_P	11 //GPIO 11
 #define DMB_ANT_SEL_N	12 //GPIO 12
-//I-pjt for ANT. swtiching
-#define PM8058_GPIO_BASE			NR_MSM_GPIOS
-#define PM8058_GPIO_PM_TO_SYS(pm_gpio)		(pm_gpio + PM8058_GPIO_BASE)
 
 #define DMB_USE_WORKQUEUE
 /************************************************************************/
@@ -119,13 +114,21 @@ void tdmb_fc8050_Must_mdelay(int32 ms)
 
 int tdmb_fc8050_power_on(void)
 {
+	// DMB_INT = GPIO29
+	// DMB_EN = GPIO28(1.2V) , 1.8V_VIO(alyways on)
+	// DMB_RESET = GPIO175
 	if ( TdmbCtrlInfo.TdmbPowerOnState == FALSE )
 	{
 		wake_lock(&TdmbCtrlInfo.wake_lock);
-
-		gpio_set_value(PM8058_GPIO_PM_TO_SYS(DMB_ANT_SEL_P-1), 0);
-		gpio_set_value(PM8058_GPIO_PM_TO_SYS(DMB_ANT_SEL_N-1), 1);
 		
+//		gpio_direction_output(DMB_EAR_ANT_SEL,true);
+//		gpio_set_value(DMB_EAR_ANT_SEL, 0);
+		gpio_direction_output(DMB_ANT_SEL_P,true);
+		gpio_direction_output(DMB_ANT_SEL_N,true);
+		gpio_set_value(DMB_ANT_SEL_P, 0);
+		gpio_set_value(DMB_ANT_SEL_N, 1);
+		
+				
 		gpio_direction_input(DMB_INT_N);
 		gpio_direction_output(DMB_RESET_N, false);
 		gpio_direction_output(DMB_EN, true);
@@ -161,9 +164,10 @@ int tdmb_fc8050_power_off(void)
 		gpio_set_value(DMB_EN, 0);
 		gpio_direction_output(DMB_INT_N, false);
 		gpio_set_value(DMB_INT_N, 0);		
-
-		gpio_set_value(PM8058_GPIO_PM_TO_SYS(DMB_ANT_SEL_P-1), 1);	// for ESD TEST
-		gpio_set_value(PM8058_GPIO_PM_TO_SYS(DMB_ANT_SEL_N-1), 0);	
+//		gpio_set_value(DMB_EAR_ANT_SEL,0);
+          	gpio_set_value(DMB_ANT_SEL_P, 0);
+		gpio_set_value(DMB_ANT_SEL_N, 0);
+		
 		wake_unlock(&TdmbCtrlInfo.wake_lock);
 	}
 	else
@@ -180,15 +184,13 @@ int tdmb_fc8050_select_antenna(unsigned int sel)
 {
 	if(LGE_BROADCAST_TDMB_ANT_TYPE_INTENNA == sel)
 	{
-
-		gpio_set_value(PM8058_GPIO_PM_TO_SYS(DMB_ANT_SEL_P-1), 0);
-		gpio_set_value(PM8058_GPIO_PM_TO_SYS(DMB_ANT_SEL_N-1), 1);
+		gpio_set_value(DMB_ANT_SEL_P, 0);
+		gpio_set_value(DMB_ANT_SEL_N, 1);
 	}
 	else if(LGE_BROADCAST_TDMB_ANT_TYPE_EARANT == sel)
 	{
-	
-		gpio_set_value(PM8058_GPIO_PM_TO_SYS(DMB_ANT_SEL_P-1), 1);
-		gpio_set_value(PM8058_GPIO_PM_TO_SYS(DMB_ANT_SEL_N-1), 0);
+		gpio_set_value(DMB_ANT_SEL_P, 1);
+		gpio_set_value(DMB_ANT_SEL_N, 0);
 	}
 	else
 	{
@@ -273,8 +275,8 @@ static irqreturn_t broadcast_tdmb_spi_isr(int irq, void *handle)
 	{
 		if (pTdmbInfo->spi_irq_status)
 		{			
-//			printk("########### broadcast_tdmb_spi_isr ###########\n");
-//			printk("######### spi read function is so late skip #########\n");			
+			printk("########### broadcast_tdmb_spi_isr ###########\n");
+			printk("######### spi read function is so late skip #########\n");			
 			return IRQ_HANDLED;
 		}		
 //		printk("***** broadcast_tdmb_spi_isr coming *******\n");
@@ -319,40 +321,20 @@ static void broacast_tdmb_spi_work(struct work_struct *tdmb_work)
 		broadcast_drv_if_isr();
 		pTdmbWorkData->spi_irq_status = FALSE;
 		fc8050_isr_control(1);
-//		printk("broadcast_tdmb_spi_work END\n");	//LGE_BROADCAST_TEST_I
-//		printk("broacast_tdmb_spi_work is called handle=0x%x\n", (unsigned int)pTdmbWorkData);	//LGE_BROADCAST_TEST_I
+//		printk("broadcast_tdmb_spi_work END\n");
+		//printk("broacast_tdmb_spi_work is called handle=0x%x\n", (unsigned int)pTdmbWorkData);
 	}
-	else
-	{
-		printk("~~~~~~~broadcast_tdmb_spi_work call but pTdmbworkData is NULL ~~~~~~~\n");
-	}
+//LGE_BROADCAST_for_TEST
+//	else
+//	{
+//		printk("~~~~~~~broadcast_tdmb_spi_work call but pTdmbworkData is NULL ~~~~~~~\n");
+//	}
 }
 
 static int broadcast_tdmb_fc8050_probe(struct spi_device *spi)
 {
 	int rc;
 
-	struct pm8058_gpio GPIO11_CFG = {
-				.direction      = PM_GPIO_DIR_OUT,
-				.pull           = PM_GPIO_PULL_NO,
-				.out_strength   = PM_GPIO_STRENGTH_HIGH,
-				.function       = PM_GPIO_FUNC_NORMAL,
-				.inv_int_pol    = 0,
-				.vin_sel        = 6,// for ESD TEST
-				.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
-				.output_value   = 0,
-				};
-	struct pm8058_gpio GPIO12_CFG = {
-
-				.direction      = PM_GPIO_DIR_OUT,
-				.pull           = PM_GPIO_PULL_NO,
-				.out_strength   = PM_GPIO_STRENGTH_HIGH,
-				.function       = PM_GPIO_FUNC_NORMAL,
-				.inv_int_pol    = 0,
-				.vin_sel        = 6,// for ESD TEST
-				.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
-				.output_value   = 0,
-				};	
 	TdmbCtrlInfo.pSpiDevice 				= spi;
 	TdmbCtrlInfo.pSpiDevice->mode 			= SPI_MODE_0;
 	TdmbCtrlInfo.pSpiDevice->bits_per_word 	= 8;
@@ -418,19 +400,17 @@ static int broadcast_tdmb_fc8050_probe(struct spi_device *spi)
 #endif
 	rc = request_irq(spi->irq, broadcast_tdmb_spi_isr, IRQF_DISABLED | IRQF_TRIGGER_FALLING, spi->dev.driver->name, &TdmbCtrlInfo);
 	printk("broadcast_tdmb_fc8050_probe request_irq=%d\n", rc);
+	//enable_irq_wake(spi->irq);
 
-	gpio_request(101, "DMB_RESET_N");
+	// DMB_EN = GPIO28(1.2V) , 1.8V_VIO(alyways on)
+	// DMB_RESET = GPIO62
+
+	//gpio_free(DMB_RESET_N);
+	//gpio_direction_output(DMB_RESET_N, false);
 	gpio_request(102, "DMB_EN");
 	gpio_request(107, "DMB_INT_N");
-	gpio_direction_output(DMB_RESET_N, false);
 	gpio_direction_output(DMB_EN, false);
 	gpio_direction_output(DMB_INT_N, false);
-
-	pm8058_gpio_config(DMB_ANT_SEL_P-1, &GPIO11_CFG);
-	pm8058_gpio_config(DMB_ANT_SEL_N-1, &GPIO12_CFG);
-	gpio_set_value(PM8058_GPIO_PM_TO_SYS(DMB_ANT_SEL_P-1), 1);	// for ESD TEST
-	gpio_set_value(PM8058_GPIO_PM_TO_SYS(DMB_ANT_SEL_N-1), 0);	// for ESD TEST
-	
 	tdmb_fc8050_interrupt_lock();
 
 #if defined(DMB_USE_WORKQUEUE)

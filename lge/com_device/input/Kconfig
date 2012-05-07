@@ -119,6 +119,24 @@ config LGE_TOUCH_REG_MAP_TM1814
 	depends on LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C && LGE_MACH_BOARD_REVA
 	help
          Register map TM1814. 
+
+config LGE_TOUCH_REG_MAP_TM1898_FW_VER0
+	bool "TM1898_FW_VER0"
+	depends on LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C
+	help
+         Register map TM1898_FW_VER0. 
+
+config LGE_TOUCH_REG_MAP_TM1898_FW_VER1
+	bool "TM1898_FW_VER1"
+	depends on LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C
+	help
+         Register map TM1898_FW_VER1. 
+         
+config LGE_TOUCH_REG_MAP_TM1898_FW_VER2
+	bool "TM1898_FW_VER2"
+	depends on LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C
+	help
+         Register map TM1898_FW_VER2. 
 endchoice
 
 config LGE_TOUCH_SYNAPTICS_FW_UPGRADE

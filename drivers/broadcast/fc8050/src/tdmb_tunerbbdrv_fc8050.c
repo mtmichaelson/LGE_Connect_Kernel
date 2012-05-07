@@ -357,8 +357,8 @@ int8	tunerbb_drv_fc8050_init(void)
 
 	res = BBM_TUNER_SELECT(0, FC8050_TUNER, BAND3_TYPE);
 
-//	res = BBM_PROBE(0);
-//	printk("tunerbb_drv_fc8050_init probe RES = %d\n", res);
+	res = BBM_PROBE(0);
+	printk("tunerbb_drv_fc8050_init probe RES = %d\n", res);
 #if 0      //fc8050 <-> Host(MSM) 간의 Interface TEST를 위한 code
 /* test */	
 	for(i=0;i<5000;i++)
@@ -825,27 +825,20 @@ int8 tunerbb_drv_fc8050_read_data(uint8* buffer, uint32* buffer_size)
 --------------------------------------------------------------------------------------- */
 int8	tunerbb_drv_fc8050_read_data(uint8* buffer, uint32* buffer_size)
 {
-	int8 retval = FC8050_RESULT_ERROR;
-	
-	if(buffer == NULL || buffer_size == NULL)
-	{
-		return retval;
-	}
-	
-	/* initialize length and valid value before isr routine */
-	msc_buffer.valid = 0;
-	msc_buffer.length=0;
-	
 	fc8050_isr(NULL);
+
+	*buffer_size=0;
 	
 	if(msc_buffer.valid && msc_buffer.length)
 	{
 		*buffer_size = msc_buffer.length;
 		memcpy(buffer, &msc_data[0], msc_buffer.length);
-		retval = FC8050_RESULT_SUCCESS;
 	}
+
+	msc_buffer.valid = 0;
+	msc_buffer.length=0;
 	
-	return retval;
+	return FC8050_RESULT_SUCCESS;
 }
 
 /*-------------------------------------------------------------------------------------
@@ -941,6 +934,7 @@ int8	tunerbb_drv_fc8050_process_multi_data(uint8 subch_cnt, uint8* input_buf, ui
 	return FC8050_RESULT_SUCCESS;
 }
 #endif
+
 
 #ifdef STREAM_TS_UPLOAD
 /*-------------------------------------------------------------------------------------
@@ -1165,26 +1159,12 @@ static uint32 tunerbb_drv_fc8050_get_viterbi_ber(void)	//msc_ber
 		ber = 0;
 	}
 	else
-	{		
+	{
 		//ber = ((tbe / bper) * 100000);
-		//ber = (tbe * 100000) / bper;
-		if(tbe > 42949)
-		{
-			ber = ((tbe * 1000)/bper)*100;
-		}
-		else
-		{
-			ber = (tbe*100000)/bper;
-		}
+		ber = (tbe * 100000) / bper;
 	}
 
 	ber = (ber >= MAX_MSC_BER) ? MAX_MSC_BER : ber;
-
-	/* ber must bigger than 0 because FactoryTest issue */
-	if(ber == 0)
-	{
-		ber = 1;
-	}
 	
 	return ber;
 

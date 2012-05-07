@@ -57,3 +57,10 @@ config LGE_MUIC_TS5USBA33402
 	help
 	  USB ID IMPEDANCE DETECTION
 	  MICROUSB SWITCH TO SUPPORT USB, UART
+
+config LGE_FOTA_MISC_INFO
+	bool "Support information that is required for FOTA"
+	default n 
+	depends on ARCH_MSM8X60
+	help
+	 support SW version, MIN, etc

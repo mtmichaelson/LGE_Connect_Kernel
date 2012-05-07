@@ -71,9 +71,9 @@ static struct gpiomux_setting gsbi10 = {
 	.pull = GPIOMUX_PULL_NONE,
 };
 
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 static struct gpiomux_setting gsbi11 = {
-	.func = GPIOMUX_FUNC_1,
+	.func = GPIOMUX_FUNC_2,
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
@@ -175,7 +175,7 @@ static struct gpiomux_setting ebi2_cs3 = {
 	.pull = GPIOMUX_PULL_UP,
 };
 
-#ifdef CONFIG_USB_PEHCI_HCD
+#if defined(CONFIG_USB_PEHCI_HCD) || defined(CONFIG_USB_PEHCI_HCD_MODULE)
 static struct gpiomux_setting ebi2_cs4 = {
 	.func = GPIOMUX_FUNC_1,
 	.drv = GPIOMUX_DRV_8MA,
@@ -189,7 +189,7 @@ static struct gpiomux_setting ebi2_adv = {
 	.pull = GPIOMUX_PULL_UP,
 };
 
-#ifdef CONFIG_USB_PEHCI_HCD
+#if defined(CONFIG_USB_PEHCI_HCD) || defined(CONFIG_USB_PEHCI_HCD_MODULE)
 static struct gpiomux_setting usb_isp1763_actv_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_8MA,
@@ -248,7 +248,7 @@ static struct gpiomux_setting sdcc2_clk_actv_cfg = {
 static struct gpiomux_setting sdcc2_suspend_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_DOWN,
+	.pull = GPIOMUX_PULL_UP,
 };
 
 static struct gpiomux_setting sdcc5_dat_0_3_cmd_actv_cfg = {
@@ -266,7 +266,7 @@ static struct gpiomux_setting sdcc5_clk_actv_cfg = {
 static struct gpiomux_setting sdcc5_suspend_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_DOWN,
+	.pull = GPIOMUX_PULL_UP,
 };
 
 static struct gpiomux_setting aux_pcm_active_config = {
@@ -293,7 +293,7 @@ static struct gpiomux_setting uart1dm_suspended = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 #else
 static struct gpiomux_setting mi2s_active_cfg = {
 	.func = GPIOMUX_FUNC_1,
@@ -350,6 +350,12 @@ static struct gpiomux_setting cam_suspend_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
+static struct gpiomux_setting cam_suspend_1_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
 static struct gpiomux_setting mdm2ap_sync_active_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -365,6 +371,11 @@ static struct gpiomux_setting mdm2ap_sync_suspend_cfg = {
 #ifdef CONFIG_LGE_SENSOR
 //1 do nothing
 #else
+static struct gpiomux_setting tm_active = {
+       .func = GPIOMUX_FUNC_GPIO,
+       .drv = GPIOMUX_DRV_2MA,
+       .pull = GPIOMUX_PULL_UP,
+  };
 static struct gpiomux_setting tm_suspended = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -377,12 +388,6 @@ static struct gpiomux_setting tma_active = {
 	.pull = GPIOMUX_PULL_UP,
 };
 #endif
-
-static struct gpiomux_setting lock_active = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_6MA,
-	.pull = GPIOMUX_PULL_UP,
-};
 
 static struct gpiomux_setting max_touch_active = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -406,6 +411,12 @@ static struct gpiomux_setting ts_ldo_suspended = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_DOWN,
+};
+
+static struct gpiomux_setting lock_active = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_6MA,
+	.pull = GPIOMUX_PULL_UP,
 };
 
 static struct gpiomux_setting ts_active = {
@@ -449,12 +460,13 @@ static struct gpiomux_setting pmic_suspended_cfg = {
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
-
+#if 0//ndef CONFIG_LGE_MHL_SII9244
 static struct gpiomux_setting cam_active_1_cfg = {
 	.func = GPIOMUX_FUNC_1,
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
+#endif
 
 static struct gpiomux_setting cam_active_2_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -466,6 +478,18 @@ static struct gpiomux_setting cam_active_3_cfg = {
 	.func = GPIOMUX_FUNC_1,
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_UP,
+};
+
+static struct gpiomux_setting cam_active_4_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_DOWN,
+};
+
+static struct gpiomux_setting cam_active_5_cfg = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_4MA,
+	.pull = GPIOMUX_PULL_NONE,
 };
 
 #ifdef CONFIG_MSM_GSBI9_UART
@@ -689,7 +713,7 @@ static struct msm_gpiomux_config msm8x60_gsbi_configs[] __initdata = {
 		},
 	},	
 #endif
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 	{
 		.gpio	   = 103,
 		.settings = {
@@ -790,7 +814,7 @@ static struct msm_gpiomux_config msm8x60_ebi2_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &ebi2_a_d,
 		},
 	},
-#ifdef CONFIG_USB_PEHCI_HCD
+#if defined(CONFIG_USB_PEHCI_HCD) || defined(CONFIG_USB_PEHCI_HCD_MODULE)
 	/* ISP VDD_3V3_EN */
 	{
 		.gpio      = 132,
@@ -921,7 +945,7 @@ static struct msm_gpiomux_config msm8x60_ebi2_configs[] __initdata = {
 	},
 };
 
-#ifdef CONFIG_USB_PEHCI_HCD
+#if defined(CONFIG_USB_PEHCI_HCD) || defined(CONFIG_USB_PEHCI_HCD_MODULE)
 static struct msm_gpiomux_config msm8x60_isp_usb_configs[] __initdata = {
 	{
 		.gpio      = 117,
@@ -982,7 +1006,7 @@ static struct msm_gpiomux_config msm8x60_uart_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &console_uart,
 		},
 	},
-#ifndef CONFIG_USB_PEHCI_HCD
+#if !defined(CONFIG_USB_PEHCI_HCD) && !defined(CONFIG_USB_PEHCI_HCD_MODULE)
 	/* USB ISP1763 may also use 117 GPIO */
 	{
 		.gpio      = 117,
@@ -1077,6 +1101,7 @@ static struct msm_gpiomux_config msm8x60_tmg200_configs[] __initdata = {
 	{
 		.gpio = 61,
 		.settings = {
+	                [GPIOMUX_ACTIVE] = &tm_active,
 			[GPIOMUX_SUSPENDED] = &tm_suspended,
 		},
 	},
@@ -1430,7 +1455,7 @@ static struct msm_gpiomux_config msm8x60_snd_configs[] __initdata = {
 	},
 };
 
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 #else
 static struct msm_gpiomux_config msm8x60_mi2s_configs[] __initdata = {
 	/* MI2S WS */
@@ -1771,37 +1796,16 @@ static struct msm_gpiomux_config msm8x60_common_configs[] __initdata = {
 
 static struct msm_gpiomux_config msm8x60_cam_configs[] __initdata = {
 	{
-		.gpio = 29,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_active_2_cfg,
-			[GPIOMUX_SUSPENDED] = &cam_suspend_cfg,
-		},
-	},
-	{
-		.gpio = 30,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_active_1_cfg,
-			[GPIOMUX_SUSPENDED] = &cam_suspend_cfg,
-		},
-	},
-	{
 		.gpio = 31,
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_active_2_cfg,
+			[GPIOMUX_ACTIVE]    = &cam_active_4_cfg,
 			[GPIOMUX_SUSPENDED] = &cam_suspend_cfg,
 		},
 	},
 	{
 		.gpio = 32,
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_active_1_cfg,
-			[GPIOMUX_SUSPENDED] = &cam_suspend_cfg,
-		},
-	},
-	{
-		.gpio = 42,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_active_2_cfg,
+			[GPIOMUX_ACTIVE]    = &cam_active_5_cfg,
 			[GPIOMUX_SUSPENDED] = &cam_suspend_cfg,
 		},
 	},
@@ -1820,25 +1824,32 @@ static struct msm_gpiomux_config msm8x60_cam_configs[] __initdata = {
 		},
 	},
 	{
-		.gpio = 105,
+		.gpio = 157,
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_active_2_cfg,
+			[GPIOMUX_ACTIVE]    = &cam_active_4_cfg,
 			[GPIOMUX_SUSPENDED] = &cam_suspend_cfg,
 		},
 	},
 	{
-		.gpio = 106,
+		.gpio = 57,
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_active_2_cfg,
+			[GPIOMUX_ACTIVE]    = &cam_active_4_cfg,
 			[GPIOMUX_SUSPENDED] = &cam_suspend_cfg,
 		},
 	},
+	{
+		.gpio = 154,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_active_4_cfg,
+			[GPIOMUX_SUSPENDED] = &cam_suspend_1_cfg,
+		},
+	},	
 };
 static struct msm_gpiomux_config msm_qt_cam_configs[] __initdata = {
 	{
 		.gpio = 32,
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_active_1_cfg,
+			[GPIOMUX_ACTIVE]    = &cam_active_5_cfg,
 			[GPIOMUX_SUSPENDED] = &cam_suspend_cfg,
 		},
 	},
@@ -1866,14 +1877,14 @@ static struct msm_gpiomux_config msm_qt_cam_configs[] __initdata = {
 	{
 		.gpio = 105,
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_active_2_cfg,
+			[GPIOMUX_ACTIVE]    = &cam_active_4_cfg,
 			[GPIOMUX_SUSPENDED] = &cam_suspend_cfg,
 		},
 	},
 	{
 		.gpio = 106,
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_active_2_cfg,
+			[GPIOMUX_ACTIVE]    = &cam_active_4_cfg,
 			[GPIOMUX_SUSPENDED] = &cam_suspend_cfg,
 		},
 	},
@@ -1989,19 +2000,39 @@ static struct msm_gpiomux_config msm8x60_audio_configs[] __initdata = {
 };
 #endif
 
+
+#ifdef CONFIG_LGE_PM_CURRENT_CONSUMPTION_FIX
+static struct gpiomux_setting boot_config_0_cfg = /* BOOT_CONFIG_0 */
+{
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct msm_gpiomux_config msm8x60_other_sleep_gpio_configs[] __initdata = {
+	/* BOOT_CONFIG_0*/
+	{
+		.gpio = 81,
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &boot_config_0_cfg,
+		}
+	},
+};
+#endif
+
 struct msm_gpiomux_configs
 msm8x60_surf_ffa_gpiomux_cfgs[] __initdata = {
 	{msm8x60_gsbi_configs, ARRAY_SIZE(msm8x60_gsbi_configs)},
 	{msm8x60_ebi2_configs, ARRAY_SIZE(msm8x60_ebi2_configs)},
 	{msm8x60_uart_configs, ARRAY_SIZE(msm8x60_uart_configs)},
-#ifdef CONFIG_USB_PEHCI_HCD
+#if defined(CONFIG_USB_PEHCI_HCD) || defined(CONFIG_USB_PEHCI_HCD_MODULE)
 	{msm8x60_isp_usb_configs, ARRAY_SIZE(msm8x60_isp_usb_configs)},
 #endif
 	{msm8x60_ts_configs, ARRAY_SIZE(msm8x60_ts_configs)},
 	{msm8x60_aux_pcm_configs, ARRAY_SIZE(msm8x60_aux_pcm_configs)},
 	{msm8x60_sdc_configs, ARRAY_SIZE(msm8x60_sdc_configs)},
 	{msm8x60_snd_configs, ARRAY_SIZE(msm8x60_snd_configs)},
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 #else
 	{msm8x60_mi2s_configs, ARRAY_SIZE(msm8x60_mi2s_configs)},
 #endif
@@ -2017,6 +2048,9 @@ msm8x60_surf_ffa_gpiomux_cfgs[] __initdata = {
 #endif
 #ifdef CONFIG_LGE_AUDIO
 	{msm8x60_audio_configs, ARRAY_SIZE(msm8x60_audio_configs)},
+#endif
+#ifdef CONFIG_LGE_PM_CURRENT_CONSUMPTION_FIX
+	{msm8x60_other_sleep_gpio_configs, ARRAY_SIZE(msm8x60_other_sleep_gpio_configs)},
 #endif
 	{NULL, 0},
 };
@@ -2034,7 +2068,7 @@ msm8x60_fluid_gpiomux_cfgs[] __initdata = {
 	{msm8x60_aux_pcm_configs, ARRAY_SIZE(msm8x60_aux_pcm_configs)},
 	{msm8x60_sdc_configs, ARRAY_SIZE(msm8x60_sdc_configs)},
 	{msm8x60_snd_configs, ARRAY_SIZE(msm8x60_snd_configs)},
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 #else
 	{msm8x60_mi2s_configs, ARRAY_SIZE(msm8x60_mi2s_configs)},
 #endif
@@ -2051,6 +2085,9 @@ msm8x60_fluid_gpiomux_cfgs[] __initdata = {
 #ifdef CONFIG_LGE_AUDIO
 	{msm8x60_audio_configs, ARRAY_SIZE(msm8x60_audio_configs)},
 #endif
+#ifdef CONFIG_LGE_PM_CURRENT_CONSUMPTION_FIX
+	{msm8x60_other_sleep_gpio_configs, ARRAY_SIZE(msm8x60_other_sleep_gpio_configs)},
+#endif
 	{NULL, 0},
 };
 
@@ -2063,7 +2100,7 @@ msm8x60_qrdc_gpiomux_cfgs[] __initdata = {
 	{msm8x60_aux_pcm_configs, ARRAY_SIZE(msm8x60_aux_pcm_configs)},
 	{msm8x60_sdc_configs, ARRAY_SIZE(msm8x60_sdc_configs)},
 	{msm8x60_snd_configs, ARRAY_SIZE(msm8x60_snd_configs)},
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 #else
 	{msm8x60_mi2s_configs, ARRAY_SIZE(msm8x60_mi2s_configs)},
 #endif
@@ -2089,7 +2126,7 @@ msm8x60_charm_gpiomux_cfgs[] __initdata = {
 	{msm8x60_aux_pcm_configs, ARRAY_SIZE(msm8x60_aux_pcm_configs)},
 	{msm8x60_sdc_configs, ARRAY_SIZE(msm8x60_sdc_configs)},
 	{msm8x60_snd_configs, ARRAY_SIZE(msm8x60_snd_configs)},
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 #else
 	{msm8x60_mi2s_configs, ARRAY_SIZE(msm8x60_mi2s_configs)},
 #endif
@@ -2108,6 +2145,9 @@ msm8x60_charm_gpiomux_cfgs[] __initdata = {
 #ifdef CONFIG_LGE_AUDIO
 		{msm8x60_audio_configs, ARRAY_SIZE(msm8x60_audio_configs)},
 #endif	
+#ifdef CONFIG_LGE_PM_CURRENT_CONSUMPTION_FIX
+	{msm8x60_other_sleep_gpio_configs, ARRAY_SIZE(msm8x60_other_sleep_gpio_configs)},
+#endif
 	{NULL, 0},
 };
 
@@ -2123,7 +2163,7 @@ msm8x60_qt_gpiomux_cfgs[] __initdata = {
 	{msm8x60_aux_pcm_configs, ARRAY_SIZE(msm8x60_aux_pcm_configs)},
 	{msm8x60_sdc_configs, ARRAY_SIZE(msm8x60_sdc_configs)},
 	{msm8x60_snd_configs, ARRAY_SIZE(msm8x60_snd_configs)},
-#ifdef CONFIG_LGE_WIRELESS_CHARGER_MAX8971
+#if defined (CONFIG_LGE_WIRELESS_CHARGER_MAX8971) || defined (CONFIG_LGE_WIRELESS_CHARGER_BQ24160)
 #else
 	{msm8x60_mi2s_configs, ARRAY_SIZE(msm8x60_mi2s_configs)},
 #endif
