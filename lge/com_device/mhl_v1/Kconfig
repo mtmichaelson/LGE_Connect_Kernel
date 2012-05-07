@@ -1,0 +1,8 @@
+#
+
+config LGE_MHL_SII9244
+	depends on ARCH_MSM8X60
+	default n
+	bool "MHL(sii9244)"
+	help
+		This is a MHL(sii9244) drvier for Qualcomm MSM8x60 based chipsets.

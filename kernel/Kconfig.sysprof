@@ -1,0 +1,17 @@
+menu "LG expand option"
+
+config LG_SYSPROF
+	bool "LG System Profiler"
+	default n
+	help
+		trace scheduler wakeup latency per tasks.
+
+config LG_SYSPROF_KEVENT
+	bool "LG System Profiler : Collect Kernel Event"
+	default n
+	depends on LG_SYSPROF
+	help
+		trace kernel event with related to CPU or specific event 
+		that is already predefined
+
+endmenu

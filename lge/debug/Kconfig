@@ -1,0 +1,27 @@
+#platform.team@lge.com	2011.01
+
+
+comment "LGE Development Feature"
+
+config LGE_QCOM_PATCH
+	default y
+	bool "Include Qualcomm Patch released to LGE"
+	help
+		Enable this to use Qualcomm Patch
+
+config LGE_DEV_NEEDS_TO_FIX
+	default y
+	bool "Include LGE temporary workaround code"
+	help
+		This feature is to include temporary workaround codes.
+		Codes included by this feature must be fixed before commercial version.
+		In the end, they need to move to LGE_DEV_FIX or something.
+
+comment "LGE Debug Feature"
+
+config LGE_DEBUG
+	default y
+	bool "LGE debug Configuration"
+	help
+		LGE debug Configuration
+

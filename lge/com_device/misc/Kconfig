@@ -1,0 +1,59 @@
+#platform.team@lge.com	2011.01
+#
+# Misc strange devices for LGE platform
+#
+ 
+config LGE_TLMM_GPIO 
+	depends on ARCH_MSM8X60
+	default y
+	bool "TLMM/GPIO Configuration"
+	help
+		LGE TLMM Configuration
+
+ 
+config LGE_HALLIC_CARKIT 
+	depends on ARCH_MSM8X60
+	tristate "Hall ic car dock"
+	default y
+	help
+	  Say Y here if you want support for the hallic car dock
+
+# Vibrator device driver
+comment "Vibrator device driver Selection"
+
+config LGE_VIBRATOR
+    bool "LGE vibrator support"
+        depends on ARCH_MSM8X60
+        default y
+        help
+          This option enables device driver support for Android Vibrator driver.
+          Some functions should be given by platform data for enable PWM, Motor IC, etc.
+
+config ANDROID_VIBRATOR
+    bool "Android vibrator support"
+        depends on ANDROID_TIMED_OUTPUT
+        default n
+        help
+          This option enalbes device driver support for Android Vibrator driver.
+          Some functions should be given by platform data for enable PWM, Motor IC, etc.
+ 
+config VIB_USE_WORK_QUEUE
+    bool "Vibrator use work queue"
+        depends on ANDROID_VIBRATOR
+        default n
+        help
+          This option enalbes device driver support for work queue.
+ 
+config VIB_USE_HIGH_VOL_OVERDRIVE
+    bool "Vibrator use the high voltage overdriving tech. for Q-Coin Motor"
+        depends on ANDROID_VIBRATOR
+        default n
+        help
+          This option enalbes device driver support for the high voltage overdriving tech. for Q-Coin Motor.
+
+config LGE_MUIC_TS5USBA33402
+	tristate "TSUSBA33402 MUIC driver"
+	default y
+	help
+	  USB ID IMPEDANCE DETECTION
+	  MICROUSB SWITCH TO SUPPORT USB, UART

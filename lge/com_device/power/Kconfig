@@ -1,0 +1,177 @@
+#platform.team@lge.com	2011.01
+
+comment "LGE PM selection"
+
+config LGE_PM
+	bool "Power Manage, Battery charging, gaguging in PM8508 PM8901"
+	default y
+	---help---
+	LGE PM related change
+
+config LGE_PMIC8058_REGULATOR
+	depends on ARCH_MSM8X60
+	default y
+	bool "LGE PMIC8058 REGULATOR Configuration"
+	help
+		LGE PMIC8058 REGULATOR Configuration
+
+config LGE_PMIC8901_REGULATOR
+	depends on ARCH_MSM8X60
+	default y
+	bool "LGE PMIC8901 REGULATOR Configuration"
+	help
+		LGE PMIC8901 REGULATOR Configuration
+
+config LGE_PMIC8058_GPIO
+	depends on ARCH_MSM8X60
+	default y
+	bool "LGE PMIC8058 GPIO Configuration"
+	help
+		LGE PMIC8058 GPIO Configuration
+
+config LGE_PMIC8058_KEYPAD
+	depends on ARCH_MSM8X60
+	default y
+	bool "LGE PMIC8058 KEYPAD Configuration"
+	help
+		LGE PMIC8058 KEYPAD Configuration
+
+config LGE_PMIC8058_MPP
+	depends on ARCH_MSM8X60
+	default y
+	bool "LGE PMIC8058 MPP Configuration"
+	help
+		LGE PMIC8058 MPP Configuration
+		
+config LGE_PMIC8058_TM
+	depends on ARCH_MSM8X60
+	default y
+	bool "LGE PMIC8058 TM Configuration"
+	help
+		LGE PMIC8058 TM Configuration
+
+config LGE_FUEL_GAUGE
+	depends on ARCH_MSM8X60
+	default y
+	bool "LGE FUEL GAUGE Configuration"
+	help
+		LGE FUEL GUAGE Configuration		
+
+config LGE_CHARGER_VOLTAGE_CURRENT_SCENARIO
+        depends on ARCH_MSM8X60
+        default y
+        bool "LGE CHARGER VOLTAGE/CURRENT SCENARIO Configuration"
+        help
+                LGE CHARGER VOLTAGE/CURRENT SCENARIO Configuration
+
+config LGE_CHARGER_TEMP_SCENARIO
+        depends on ARCH_MSM8X60
+        default y
+        bool "LGE CHARGER TEMP SCENARIO Configuration"
+        help
+                LGE CHARGER TEMP SCENARIO Configuration
+
+config LGE_WIRELESS_CHARGER_MAX8971
+        depends on ARCH_MSM8X60
+        default n
+        bool "LGE WIRELESS Charger MAX8971 Configuration"
+        help
+                LGE WIRELESS Charger MAX8971 Configuration
+
+config LGE_WIRELESS_CHARGER_BQ24160
+        depends on ARCH_MSM8X60
+        default y
+        bool "LGE WIRELESS Charger BQ24160 Configuration"
+        help
+                LGE WIRELESS Charger BQ24160 Configuration
+
+config LGE_MDM_PMIC_8028
+        depends on ARCH_MSM8X60
+        default y
+        bool "LGE MDM PMIC enable control"
+        help
+                LGE MDM PMIC enable control Configuration
+
+config LGE_I_POWER_KPROBE_DEBUG
+	depends on ARCH_MSM8X60
+	default n
+	bool "KPROBE debug module"
+	help
+		LGE I Prj kprobe debug module
+
+config LGE_PM_BATTERY_ID_CHECKER
+        depends on ARCH_MSM8X60
+        default y
+        bool "LGE PM BATTERY ID CHECKER"
+        help
+                LGE PM Battery Id Checker Configuration
+                
+config LGE_PM_CURRENT_CABLE_TYPE
+        depends on ARCH_MSM8X60
+        default y
+        bool "LGE PM CURRENT CABLE TYPE"
+        help
+                LGE PM Set Current Cable Type Configuration
+
+config LGE_AT_COMMAND_ABOUT_POWER
+        depends on ARCH_MSM8X60
+        default y
+        bool "LGE AT COMMAND ABOUT POWER"
+        help
+                LGE AT Command about power Configuration
+
+config LGE_BATT_SOC_FOR_NPST
+        depends on ARCH_MSM8X60
+        default y
+        bool "LGE BATTERY SOC FOR DOWNLOAD"
+        help
+                LGE Battery Soc for download to prevent download with low battery Configuration
+
+config LGE_PM_BATTERY_ALARM
+	depends on ARCH_MSM8X60
+	default y
+	bool "LGE PM8058 BATTERY ALARM"
+	help
+		LGE PM8058 BATTERY ALARM Configuration
+
+config LGE_PM_POWER_OFF_SCENARIO
+	depends on ARCH_MSM8X60
+	default y
+	bool "LGE POWER OFF SCENARIO"
+	help
+		LGE Power Off Scenario configuration in android side
+
+config LGE_PM_CURRENT_CONSUMPTION_FIX
+	depends on ARCH_MSM8X60
+	default y
+	bool "LGE CURRENT CUNSUMPTION FIX"
+	help
+		LGE Current Consumption Fix	
+config LGE_PM_POWER_RTC_ALARM_OFF
+  depends on ARCH_MSM8X60
+  default y
+  bool "LGE RTC ALARM OFF FIX"
+  help
+    LGE RTC ALARM bug fix configuration in android side
+    
+config LGE_PM_TEMPERATURE_MONITOR
+  depends on ARCH_MSM8X60
+  default y
+  bool "LGE TEMPERATURE MONITOR"
+  help
+    LGE temperature monitoring on sleep mode
+
+config LGE_PM_FACTORY_CURRENT_DOWN
+  depends on ARCH_MSM8X60
+  default y
+  bool "LGE FACTORY CURRENT DOWN"
+  help
+    LGE current down in factory   
+
+config LGE_PM_FACTORY_FUEL_GAUGE
+  depends on ARCH_MSM8X60
+  default y
+  bool "LGE PM FACTORY FUEL_GAUGE"
+  help
+    LGE SKIP fuel gauge i2c in factory
+

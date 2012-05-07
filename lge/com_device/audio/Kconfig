@@ -1,0 +1,16 @@
+#platform.team@lge.com	2011.01
+
+config LGE_AUDIO
+	default y
+	bool "LGE Audio Configuration"
+	help
+		LGE AUDIO Configuration
+
+# Audio driver configuration
+comment "Audio driver Selection"
+
+config LGE_AUDIO_AMP_WM9093
+        bool "Audio subsystem WM9093"
+        default y
+        ---help---
+                Wolfson microelectronics Ultra Low power Audio subsystem

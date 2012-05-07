@@ -1,0 +1,39 @@
+#platform.team@lge.com	2011.01
+
+config MACH_LGE_I_BOARD
+       bool "LGE_I_BOARD"
+       depends on ARCH_MSM8X60
+       default y
+       ---help---
+         LGE I-project. 
+
+choice
+	prompt "LGE board type"
+	default MACH_LGE_I_BOARD_VZW
+
+config MACH_LGE_I_BOARD_VZW
+       bool "LGE_I_BOARD_VZW"
+       depends on MACH_LGE_I_BOARD
+       ---help---
+         LGE I-project for VZW. 
+
+config MACH_LGE_I_BOARD_LGU
+       bool "LGE_I_BOARD_LGU"
+       depends on MACH_LGE_I_BOARD
+       ---help---
+         LGE I-project for LGU.
+
+config MACH_LGE_C1_BOARD_MPS
+       bool "LGE_C1_BOARD_MPS"
+       depends on MACH_LGE_I_BOARD
+       ---help---
+         LGE C1-project for Metro PCS.
+
+config MACH_LGE_HDK_8x60
+       bool "LGE_I_BOARD_HDK_8x60"
+       depends on MACH_LGE_I_BOARD
+       ---help---
+         LGE I-project for HDK_8x60.
+
+endchoice
+ 

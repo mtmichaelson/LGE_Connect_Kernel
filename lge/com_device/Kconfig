@@ -1,0 +1,51 @@
+#platform.team@lge.com	2011.01
+
+config LGE_MACH_BOARD_REVA
+	depends on ARCH_MSM8X60
+	default n
+	bool "BOARD_REVA"
+	help
+		LGE MSM8660 RevA Board Configuration
+
+config LGE_MACH_BOARD_REVB
+	depends on ARCH_MSM8X60
+	default y
+	bool "BOARD_REVB"
+	help
+		LGE MSM8660 RevB Board Configuration
+
+config LGE_MACH_BOARD_REVC
+	depends on ARCH_MSM8X60
+	default n
+	bool "BOARD_REVC"
+	help
+		LGE MSM8660 RevC Board Configuration
+
+
+menu "Audio"
+source "lge/com_device/audio/Kconfig"
+endmenu 
+
+menu "Camera"
+source "lge/com_device/camera/Kconfig"
+endmenu
+
+menu "Display"
+source "lge/com_device/display/Kconfig"
+endmenu 
+
+menu "Input"
+source "lge/com_device/input/Kconfig"
+endmenu
+
+menu "Misc."
+source "lge/com_device/misc/Kconfig"
+endmenu
+
+menu "Power"
+source "lge/com_device/power/Kconfig"
+endmenu
+
+menu "MHL"
+source "lge/com_device/mhl_v1/Kconfig"
+endmenu

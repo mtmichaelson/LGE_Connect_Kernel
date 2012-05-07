@@ -1,0 +1,75 @@
+#platform.team@lge.com	2011.01
+
+menu "Device Drivers"
+
+comment "LGE display driver selection"
+
+config LGE_BACKLIGHT_AAT2862
+	bool "select aat2862 device as LGE backlight management for I "
+	default n
+	---help---
+	LGE backlight management (aat2862)
+
+config LGE_BACKLIGHT_LM3530
+	bool "select lm3530 device as LGE backlight management for I "
+	default y
+	---help---
+	LGE backlight management (lm3530)
+
+choice
+	prompt "LGE Display Selection"
+	default LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT 
+
+config LGE_DISPLAY_MIPI_SHARP_VIDEO_WVGA_PT
+	bool "LGE_DISPLAY_MIPI_SHARP_VIDEO_WVGA_PT"
+	select FB_MSM_MIPI_DSI
+	---help---
+	LGE display management 
+
+config LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT
+	bool "LGE_DISPLAY_MIPI_LGIT_VIDEO_HD_PT"
+	select FB_MSM_MIPI_DSI
+	---help---
+	LGE display management 
+endchoice
+
+endmenu
+menu "Features"
+
+config LGE_I_DISP_FBREAD
+	bool "enable msm_fb_read"
+	default y
+	---help---
+	select this feature if you want to dump framebuffer
+
+config LGE_I_DISP_EARLYSUSPEND
+	bool "enable LCD early suspend"
+	default y
+	---help---
+	select this feature if you want to enable LCD early suspend
+
+config LGE_I_DISP_UNDERRUN
+	bool "prevent under-run during video play"
+	default y
+	---help---
+	select this feature for preventing under-run issue
+
+config LGE_I_DISP_PHYSIZE
+	bool "hard-coding for LCD physical size"
+	default y
+	---help---
+	select this feature for fb_info.var.width=56, fb_info.var.height=99
+
+config LGE_I_DISP_HSMODE
+	bool "MIPI clk High Speed mode"
+	default y
+	---help---
+	select this feature for HM mode MIPI clock
+
+config LGE_BOOTLOADER_DISP_INIT
+	bool "LGE Bootloader Display support"
+	default y
+	---help---
+	select this feature for LGE Bootloader Display support
+
+endmenu

@@ -1,0 +1,139 @@
+#platform.team@lge.com	2011.01
+#
+# Input driver configuration
+#
+
+
+# Sensor driver configuration
+comment "Sensor driver Selection"
+config LGE_SENSOR
+	default y
+	bool "LGE Sensor Devices Common Configuration"
+	help
+		LGE Sensor Devices Common Configuration
+
+config LGE_SENSOR_FUSION
+	default y
+	bool "LGE Sensor Fusion Configuration"
+	help
+		LGE Sensor Fusion Configuration
+
+config LGE_SENSOR_ACCELEROMETER
+	default y
+	bool "LGE Accelerometer STM K3DH Configuration"
+	help
+		LGE Accelerometer STM K3DH Configuration
+		
+config LGE_SENSOR_GYROSCOPE
+	default y
+	bool "LGE Gyroscope STM K3GTR Configuration"
+	help
+		LGE Gyroscope STM K3GTR Configuration		
+		
+config LGE_SENSOR_DCOMPASS
+	default y
+	bool "LGE Digital Compass AICHI AMI306 Configuration"
+	help
+		LGE Digital Compass  AICHI AMI306 Configuration		
+
+config LGE_SENSOR_PROXIMITY
+	tristate "APDS9900 based proximity and light sensor"
+	help
+	  Say Y here if you have a sensor interface using the
+	  APDS9900 controller, and your board-specific
+	  setup code includes i2c devices.
+
+	  If unsure, say N (but it's safe to say "Y").
+config LGE_SENSOR_GP2AP
+	tristate "GP2AP based proximity sensor"
+	help
+	  Say Y here if you have a sensor interface using the
+	  GP2AP controller, and your board-specific
+	  setup code includes i2c devices.
+
+	  If unsure, say N (but it's safe to say "Y").
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ads7846.
+
+config LGE_SENSOR_KR3DH
+	tristate "KR3DH based accelerometer sensor"
+	help
+	  Say Y here if you have a sensor interface using the
+	  KR3DH controller, and your board-specific
+	  setup code includes i2c devices.
+
+	  If unsure, say N (but it's safe to say "Y").
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ads7846.
+
+config LGE_SENSOR_KR3DM
+	tristate "8bit accel data for KR3DM"
+	help
+	  Say Y here if you have a sensor interface using the
+	  KR3DM controller, and your board-specific
+	  setup code includes i2c devices.
+
+	  If unsure, say N (but it's safe to say "Y").
+	  
+config LGE_SENSOR_AK8973
+	tristate "AK8973 based ecompass sensor"
+	help
+	  Say Y here if you have a sensor interface using the
+	  AK8973 controller, and your board-specific
+	  setup code includes i2c devices.
+
+	  If unsure, say N (but it's safe to say "Y").
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ads7846.
+
+config LGE_SENSOR_AMI304
+        tristate "AMI304 based gyro sensor"
+        help
+          Say Y here if you have a sensor interface using the
+          AMI304 controller, and your board-specific
+          setup code includes i2c devices.
+
+          If unsure, say N (but it's safe to say "Y").          
+          
+config LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C
+	tristate "Synaptics RMI4 protocol based I2C interface Touchscreen Driver"
+	help
+	  This enables support for Synaptics RMI4 protocol I2C interface Touchscreens.               
+choice
+	prompt "Register map"
+	depends on LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C
+
+config LGE_TOUCH_REG_MAP_TM1804
+	default y
+	bool "TM1804"
+	depends on LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C && (LGE_MACH_BOARD_REVB || LGE_MACH_BOARD_REVC)
+	help
+         Register map TM1804. 
+
+config LGE_TOUCH_REG_MAP_TM1814
+	default y
+	bool "TM1814"
+	depends on LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C && LGE_MACH_BOARD_REVA
+	help
+         Register map TM1814. 
+endchoice
+
+config LGE_TOUCH_SYNAPTICS_FW_UPGRADE
+	bool "Synaptics ClearPad General F/W upgread"
+	depends on LGE_TOUCHSCREEN_SYNAPTICS_RMI4_I2C
+	help
+	  This enables support for Synaptics general F/W upgrade.               
+
+config LGE_HEADSET_DETECTION_FSA8008
+        tristate "Fairchild  FSA8008 headset detection"
+        help
+          This enables support for Fairchild  FSA8008 headset detection.
+
+config LGE_NFC_NXP_PN544PN65N
+	bool "NXP PN544 (or PN65N) I2C NFC
+	default y
+	help
+	  This enables support for NXP PN544(or PN65N) I2C based NFC.

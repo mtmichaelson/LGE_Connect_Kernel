@@ -1,0 +1,25 @@
+#platform.team@lge.com	2011.01
+
+menu "LGE platform selection"
+
+menu "LGE Board selection"
+source "lge/lge_board/Kconfig"
+endmenu
+
+menu "LGE Device selection"
+source "lge/com_device/Kconfig"
+endmenu
+
+menu "LGE Factory Feature"
+source "lge/factory/Kconfig"
+endmenu
+
+menu "LGE Development Feature"
+source "lge/debug/Kconfig"
+endmenu
+
+menu "LGE ETA Feature"
+source "lge/eta/Kconfig"
+endmenu
+
+endmenu

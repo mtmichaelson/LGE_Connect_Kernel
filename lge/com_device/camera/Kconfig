@@ -1,0 +1,80 @@
+#platform.team@lge.com	2011.01
+
+config LGE_CAMERA
+	default y
+	bool "LGE Camera Configuration"
+	help
+		LGE CAMERA Configuration
+
+
+# Camera driver configuration
+comment "Camera Sensor Selection"
+
+config LGE_SENSOR_IMX105
+	bool "Sensor IMX105 8MP MIPI (BAYER 8M)"
+	depends on MSM_CAMERA && ARCH_MSM8X60
+	default y
+	---help---
+	SONY 8M Bayer MIPI Sensor with Autofocus
+	  	  
+config LGE_SENSOR_ISX005
+	bool "Sensor isx005 (YUV 3M)"
+	#depends on MSM_CAMERA && !ARCH_MSM8X60
+	default n
+	---help---
+	  SONY 3M YUV Sensor with AutoFocus
+	  
+config LGE_SENSOR_ISX006
+	bool "Sensor isx006 (YUV 5M)"
+	#depends on MSM_CAMERA && !ARCH_MSM8X60
+	default n
+	---help---
+	  SONY 5M Sensor with AutoFocus
+	
+config LGE_SENSOR_MT9M113
+	bool "Sensor mt9m113 (YUV 1.3M)"
+	#depends on MSM_CAMERA && !ARCH_MSM8X60
+	default n
+	---help---
+	  APTINA 1.3M Sensor
+
+config LGE_SENSOR_MT9M114
+	bool "Sensor MT9M114 1.26MP MIPI (SOC 1.26M)"
+	depends on MSM_CAMERA && ARCH_MSM8X60
+	default y
+	---help---
+	APTINA 1.26M SOC MIPI Sensor without Autofocus	
+
+config VTCAM_SD_IMAGE_TUNNING
+	bool "SD Card Image Tuning for MT9M114"
+	depends on LGE_SENSOR_MT9M114
+	default y
+	---help---
+	SD Card Image Tuning for MT9M114
+
+comment "Camera flash Selection"
+	  	  
+config LGE_FLASH_AAT1270
+	bool "AAT1270 flash support"
+	#depends on MSM_CAMERA && !ARCH_MSM8X60
+	default n
+	---help---
+	  Enable support for AAT1270 flash for msm camera
+
+config LGE_FLASH_LM3559
+	bool "LM3559 flash support"
+	#depends on MSM_CAMERA && ARCH_MSM8X60
+	default y
+	---help---
+	  Enable support for LM3559 flash for msm camera
+
+
+comment "Camera Power Selection"
+
+config LGE_PM_BH6172
+	bool "BH6172 pm support"
+	#depends on MSM_CAMERA && !ARCH_MSM8X60
+	default n
+	---help---
+	  SUBPMIC for camera sensor
+

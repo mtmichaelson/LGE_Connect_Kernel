@@ -1,0 +1,13 @@
+#platform.team@lge.com	2011.01
+
+config ATCMD_VIRTUAL_KBD
+	bool "Support atcmd virtual keyboard"
+	default n
+	help
+	  Say Y here if you want to enable the driver for the atcmd virtual keyboard.
+
+config ETA_EVENT_LOG
+        bool "Support ETA event(key, touch) logging"
+        default n
+        help
+	  Say Y here if you want to enable the driver for the ETA event logger
