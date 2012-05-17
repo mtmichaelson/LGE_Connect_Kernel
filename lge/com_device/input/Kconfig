@@ -151,7 +151,7 @@ config LGE_HEADSET_DETECTION_FSA8008
           This enables support for Fairchild  FSA8008 headset detection.
 
 config LGE_NFC_NXP_PN544PN65N
-	bool "NXP PN544 (or PN65N) I2C NFC
+	bool "NXP PN544 (or PN65N) I2C NFC"
 	default y
 	help
 	  This enables support for NXP PN544(or PN65N) I2C based NFC.

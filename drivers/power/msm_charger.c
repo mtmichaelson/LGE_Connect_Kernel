@@ -1101,7 +1101,7 @@ static int chg_is_battery_too_hot_or_too_cold(int temp_adc, int batt_level)
 				get_ext_cable_type_value() == USB_CABLE_DTC_500MA ||
 				get_ext_cable_type_value() == TA_CABLE_FORGED_500MA
 				)
-				pm_chg_imaxsel_set(450);
+				pm_chg_imaxsel_set(650);
           }
           else
           {
@@ -1130,7 +1130,7 @@ static int chg_is_battery_too_hot_or_too_cold(int temp_adc, int batt_level)
 			else if(get_ext_cable_type_value() == USB_CABLE_DTC_500MA)
 				pm_chg_imaxsel_set(500);
 			else
-				pm_chg_imaxsel_set(450);
+				pm_chg_imaxsel_set(650);
           }
         break;
 
@@ -1169,7 +1169,7 @@ static int chg_is_battery_too_hot_or_too_cold(int temp_adc, int batt_level)
 				get_ext_cable_type_value() == TA_CABLE_FORGED_500MA ||
 				get_ext_cable_type_value() == USB_CABLE_DTC_500MA
 				)
-				pm_chg_imaxsel_set(450);			
+				pm_chg_imaxsel_set(650);			
           }
 		  
           else if(chg_batt_temp == CHG_BATT_TEMP_M4_41 || chg_batt_temp == CHG_BATT_TEMP_M10_M5 || chg_batt_temp == CHG_BATT_TEMP_42_45)
@@ -1199,7 +1199,7 @@ static int chg_is_battery_too_hot_or_too_cold(int temp_adc, int batt_level)
 			else if(get_ext_cable_type_value() == USB_CABLE_DTC_500MA)
 				pm_chg_imaxsel_set(500);
 			else
-				pm_chg_imaxsel_set(450);
+				pm_chg_imaxsel_set(650);
           }
           else
    		  {
@@ -1242,7 +1242,7 @@ static int chg_is_battery_too_hot_or_too_cold(int temp_adc, int batt_level)
 			else if(get_ext_cable_type_value() == USB_CABLE_DTC_500MA)
 				pm_chg_imaxsel_set(500);			
 			else
-				pm_chg_imaxsel_set(450);
+				pm_chg_imaxsel_set(650);
 		}
 /* kiwone.seo@lge.com 2011-05-12, charging scenario. do not anything.		
 		else if((chg_batt_temp == CHG_BATT_TEMP_46_55 && batt_level <= 4000) || chg_batt_temp == CHG_BATT_TEMP_42_45)
@@ -1261,7 +1261,7 @@ static int chg_is_battery_too_hot_or_too_cold(int temp_adc, int batt_level)
 				get_ext_cable_type_value() == TA_CABLE_DTC_800MA ||				
 				get_ext_cable_type_value() == TA_CABLE_FORGED_500MA
 				)
-				pm_chg_imaxsel_set(450);
+				pm_chg_imaxsel_set(650);
         }
 */        
         else
